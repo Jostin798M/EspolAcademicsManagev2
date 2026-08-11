@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Panel academico — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Panel academico</h1>
+    <p class="text-body-secondary mb-0">
+      Gestion de los modulos del sistema ESPOL Academics.
+    </p>
+  </div>
+
+  <div class="row g-3">
+    {% for modulo in modulos_sistema %}
+      <div class="col-lg-4">
+        <div class="card shadow-sm h-100">
+          <div class="card-header bg-transparent d-flex align-items-center gap-2">
+            <span class="marca-icono"><i class="{{ modulo.icono }}"></i></span>
+            <div>
+              <h2 class="h6 mb-0">{{ modulo.nombre }}</h2>
+              <div class="small text-body-secondary">{{ modulo.descripcion }}</div>
+            </div>
+          </div>
+
+          <div class="card-body">
+            <ul class="list-group list-group-flush">
+              {% for etiqueta, total, ruta in modulo.registros %}
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                  <a href="{% url ruta %}" class="link-body-emphasis text-decoration-none">{{ etiqueta }}</a>
+                  <span class="badge text-bg-primary rounded-pill">{{ total }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="row g-3 mt-1">
+    <div class="col-lg-8">
+      <div class="card shadow-sm h-100 border-primary">
+        <div class="card-body">
+          <h2 class="h6"><i class="bi-bar-chart-line text-primary"></i> Reportes academicos</h2>
+          <p class="text-body-secondary small mb-3">
+            Indicadores de rendimiento, promedios por curso, tasa de entrega y
+            avance de los estudiantes, con exportacion a CSV y PDF.
+          </p>
+          <a href="{% url 'reportes:tablero' %}" class="btn btn-primary btn-sm">
+            Abrir reportes
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm h-100">
+        <div class="card-body">
+          <h2 class="h6">Aplicacion web</h2>
+          <p class="text-body-secondary small mb-3">
+            Interfaz para estudiantes, profesores y administradores.
+          </p>
+          <a href="/" class="btn btn-outline-primary btn-sm">
+            <i class="bi-box-arrow-up-right"></i> Ir a la aplicacion
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

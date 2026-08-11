@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_pagina }} — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="mb-4">
+        <h1 class="h3 mb-1">{{ titulo_pagina }}</h1>
+        <p class="text-body-secondary mb-0">Los campos marcados con <strong>*</strong> son obligatorios.</p>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.quiz.id_for_label }}">
+                {{ form.quiz.label }}
+              </label>
+
+              {{ form.quiz }}
+
+              {% if form.quiz.help_text %}
+                <div class="form-text">{{ form.quiz.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.quiz.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.orden.id_for_label }}">
+                {{ form.orden.label }}
+              </label>
+
+              {{ form.orden }}
+
+              {% if form.orden.help_text %}
+                <div class="form-text">{{ form.orden.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.orden.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.tipo.id_for_label }}">
+                {{ form.tipo.label }}
+              </label>
+
+              {{ form.tipo }}
+
+              {% if form.tipo.help_text %}
+                <div class="form-text">{{ form.tipo.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.tipo.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.enunciado.id_for_label }}">
+                {{ form.enunciado.label }}
+              </label>
+
+              {{ form.enunciado }}
+
+              {% if form.enunciado.help_text %}
+                <div class="form-text">{{ form.enunciado.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.enunciado.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.puntaje.id_for_label }}">
+                {{ form.puntaje.label }}
+              </label>
+
+              {{ form.puntaje }}
+
+              {% if form.puntaje.help_text %}
+                <div class="form-text">{{ form.puntaje.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.puntaje.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.opciones.id_for_label }}">
+                {{ form.opciones.label }}
+              </label>
+
+              {{ form.opciones }}
+
+              {% if form.opciones.help_text %}
+                <div class="form-text">{{ form.opciones.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.opciones.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.respuesta_correcta.id_for_label }}">
+                {{ form.respuesta_correcta.label }}
+              </label>
+
+              {{ form.respuesta_correcta }}
+
+              {% if form.respuesta_correcta.help_text %}
+                <div class="form-text">{{ form.respuesta_correcta.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.respuesta_correcta.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi-check-lg"></i> {{ texto_boton }}
+              </button>
+
+              <a href="{% url 'evaluaciones:pregunta_lista' %}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

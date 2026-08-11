@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Cursos — Profesor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Mis Cursos</span>
+        <nav class="breadcrumb"><span class="current">Inicio</span></nav>
+      </div>
+      <div class="topbar-right">
+        <a href="curso-form.html" class="btn btn-primary btn-sm">
+          <i class="bi-plus-lg"></i> Nuevo Curso
+        </a>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header">
+        <h2>Mis Cursos</h2>
+      </div>
+
+      <div class="section-label" style="margin-bottom:12px;font-size:.75rem;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em">
+        Cursos activos
+      </div>
+      <div class="courses-grid" id="grid-activos"></div>
+
+      <div id="sec-archivados" style="margin-top:32px;display:none">
+        <div class="section-label" style="margin-bottom:12px;font-size:.75rem;font-weight:600;color:var(--color-text-muted);text-transform:uppercase;letter-spacing:.05em">
+          Archivados
+        </div>
+        <div class="courses-grid" id="grid-archivados"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/profesor.js"></script>
+<script>MisCursosProfesor.init();</script>
+</body>
+</html>

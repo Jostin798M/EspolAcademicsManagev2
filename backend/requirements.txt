@@ -1,0 +1,3 @@
+# Dependencias de la aplicacion (Windows, Linux y macOS).
+Django==6.0.6
+whitenoise==6.11.0

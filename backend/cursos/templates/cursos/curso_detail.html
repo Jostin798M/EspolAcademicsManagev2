@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de el curso — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de el curso</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'cursos:curso_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.id_curso }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Codigo</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.codigo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Nombre</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.nombre }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Descripcion</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.descripcion }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Facultad</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.facultad }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Profesor</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.profesor }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Fecha de inicio</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.fecha_inicio }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Fecha de fin</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.fecha_fin }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estado</dt>
+            <dd class="col-sm-8 pt-1">{% if curso.estado == 'activo' %}
+                  <span class="badge text-bg-success">Activo</span>
+              {% else %}
+                  <span class="badge text-bg-warning">Archivado</span>
+              {% endif %}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Modulos</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.modulos.count }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Inscripciones</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.inscripciones.count }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Tareas</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.tareas.count }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Quizzes</dt>
+            <dd class="col-sm-8 pt-1">{{ curso.quizzes.count }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'cursos:curso_editar' curso.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'cursos:curso_eliminar' curso.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

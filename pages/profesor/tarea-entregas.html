@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Entregas — Profesor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+  <style>
+    .modal-overlay { display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:200;align-items:center;justify-content:center;padding:24px }
+    .modal-overlay.open { display:flex }
+    .modal-box { background:var(--color-surface);border-radius:var(--radius-xl);box-shadow:var(--shadow-lg);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;animation:fadeIn .2s ease }
+    .modal-header { display:flex;align-items:center;justify-content:space-between;padding:20px 24px;border-bottom:1px solid var(--color-border) }
+    .modal-header h4 { margin:0 }
+    .modal-body { padding:24px }
+    .modal-footer { padding:16px 24px;border-top:1px solid var(--color-border);display:flex;justify-content:flex-end;gap:8px;background:#FAFAFA;border-radius:0 0 var(--radius-xl) var(--radius-xl) }
+  </style>
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Entregas</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <a id="btn-volver" href="#">Curso</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current">Entregas</span>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header">
+        <div>
+          <h2 id="tarea-titulo">—</h2>
+          <div style="display:flex;gap:16px;margin-top:4px">
+            <span class="text-sm text-muted" id="tarea-puntaje"></span>
+            <span class="text-sm text-muted" id="tarea-limite"></span>
+          </div>
+        </div>
+        <a id="btn-volver-btn" href="#" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <div class="table-container">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Estudiante</th>
+              <th>Fecha entrega</th>
+              <th>Estado</th>
+              <th>Nota</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-entregas"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Modal: ver entrega -->
+<div class="modal-overlay" id="modal-entrega">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h4>Entrega de <span id="entrega-estudiante"></span></h4>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-entrega').classList.remove('open')"><i class="bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body" id="entrega-contenido"></div>
+  </div>
+</div>
+
+<!-- Modal: calificar -->
+<div class="modal-overlay" id="modal-calificar">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h4>Calificar a <span id="cal-estudiante"></span></h4>
+      <button class="btn btn-ghost btn-sm" onclick="ModalCalificar.cerrar()"><i class="bi-x-lg"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nota <span class="required">*</span></label>
+        <input type="number" id="cal-nota" class="form-control" min="0" step="0.1">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Retroalimentacion</label>
+        <textarea id="cal-comentario" class="form-control" rows="3" placeholder="Comentario para el estudiante..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="ModalCalificar.cerrar()">Cancelar</button>
+      <button class="btn btn-primary" onclick="ModalCalificar.guardar()"><i class="bi-check-lg"></i> Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/profesor.js"></script>
+<script>
+  TareaEntregas.init();
+  document.getElementById("btn-volver-btn").href = document.getElementById("btn-volver").href;
+</script>
+</body>
+</html>

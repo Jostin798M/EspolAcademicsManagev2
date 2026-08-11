@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de el componente — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de el componente</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'cursos:componente_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ componente.id_componente }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Curso</dt>
+            <dd class="col-sm-8 pt-1">{{ componente.curso }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Componente</dt>
+            <dd class="col-sm-8 pt-1">{{ componente.componente }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Porcentaje</dt>
+            <dd class="col-sm-8 pt-1">{{ componente.porcentaje }}%</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Orden</dt>
+            <dd class="col-sm-8 pt-1">{{ componente.orden }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'cursos:componente_editar' componente.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'cursos:componente_eliminar' componente.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

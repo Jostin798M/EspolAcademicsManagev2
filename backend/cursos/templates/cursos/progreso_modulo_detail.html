@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de el progreso — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de el progreso</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'cursos:progreso_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ progreso.id_progreso }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estudiante</dt>
+            <dd class="col-sm-8 pt-1">{{ progreso.usuario }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Modulo</dt>
+            <dd class="col-sm-8 pt-1">{{ progreso.modulo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Curso</dt>
+            <dd class="col-sm-8 pt-1">{{ progreso.modulo.curso.codigo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Completado</dt>
+            <dd class="col-sm-8 pt-1">{% if progreso.completado %}
+                  <span class="badge text-bg-success">Completado</span>
+              {% else %}
+                  <span class="badge text-bg-secondary">Pendiente</span>
+              {% endif %}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Ultima actualizacion</dt>
+            <dd class="col-sm-8 pt-1">{{ progreso.fecha }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'cursos:progreso_editar' progreso.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'cursos:progreso_eliminar' progreso.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

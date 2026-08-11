@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_pagina }} — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="mb-4">
+        <h1 class="h3 mb-1">{{ titulo_pagina }}</h1>
+        <p class="text-body-secondary mb-0">Los campos marcados con <strong>*</strong> son obligatorios.</p>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.tarea.id_for_label }}">
+                {{ form.tarea.label }}
+              </label>
+
+              {{ form.tarea }}
+
+              {% if form.tarea.help_text %}
+                <div class="form-text">{{ form.tarea.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.tarea.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.usuario.id_for_label }}">
+                {{ form.usuario.label }}
+              </label>
+
+              {{ form.usuario }}
+
+              {% if form.usuario.help_text %}
+                <div class="form-text">{{ form.usuario.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.usuario.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.estado.id_for_label }}">
+                {{ form.estado.label }}
+              </label>
+
+              {{ form.estado }}
+
+              {% if form.estado.help_text %}
+                <div class="form-text">{{ form.estado.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.estado.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.fecha.id_for_label }}">
+                {{ form.fecha.label }}
+              </label>
+
+              {{ form.fecha }}
+
+              {% if form.fecha.help_text %}
+                <div class="form-text">{{ form.fecha.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.fecha.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.texto.id_for_label }}">
+                {{ form.texto.label }}
+              </label>
+
+              {{ form.texto }}
+
+              {% if form.texto.help_text %}
+                <div class="form-text">{{ form.texto.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.texto.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.archivo.id_for_label }}">
+                {{ form.archivo.label }}
+              </label>
+
+              {{ form.archivo }}
+
+              {% if form.archivo.help_text %}
+                <div class="form-text">{{ form.archivo.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.archivo.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.imagen.id_for_label }}">
+                {{ form.imagen.label }}
+              </label>
+
+              {{ form.imagen }}
+
+              {% if form.imagen.help_text %}
+                <div class="form-text">{{ form.imagen.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.imagen.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.link.id_for_label }}">
+                {{ form.link.label }}
+              </label>
+
+              {{ form.link }}
+
+              {% if form.link.help_text %}
+                <div class="form-text">{{ form.link.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.link.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.nota.id_for_label }}">
+                {{ form.nota.label }}
+              </label>
+
+              {{ form.nota }}
+
+              {% if form.nota.help_text %}
+                <div class="form-text">{{ form.nota.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.nota.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.comentario.id_for_label }}">
+                {{ form.comentario.label }}
+              </label>
+
+              {{ form.comentario }}
+
+              {% if form.comentario.help_text %}
+                <div class="form-text">{{ form.comentario.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.comentario.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi-check-lg"></i> {{ texto_boton }}
+              </button>
+
+              <a href="{% url 'evaluaciones:entrega_lista' %}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

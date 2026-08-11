@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_pagina }} — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="mb-4">
+        <h1 class="h3 mb-1">{{ titulo_pagina }}</h1>
+        <p class="text-body-secondary mb-0">Los campos marcados con <strong>*</strong> son obligatorios.</p>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.curso.id_for_label }}">
+                {{ form.curso.label }}
+              </label>
+
+              {{ form.curso }}
+
+              {% if form.curso.help_text %}
+                <div class="form-text">{{ form.curso.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.curso.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.componente.id_for_label }}">
+                {{ form.componente.label }}
+              </label>
+
+              {{ form.componente }}
+
+              {% if form.componente.help_text %}
+                <div class="form-text">{{ form.componente.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.componente.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.porcentaje.id_for_label }}">
+                {{ form.porcentaje.label }}
+              </label>
+
+              {{ form.porcentaje }}
+
+              {% if form.porcentaje.help_text %}
+                <div class="form-text">{{ form.porcentaje.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.porcentaje.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.orden.id_for_label }}">
+                {{ form.orden.label }}
+              </label>
+
+              {{ form.orden }}
+
+              {% if form.orden.help_text %}
+                <div class="form-text">{{ form.orden.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.orden.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi-check-lg"></i> {{ texto_boton }}
+              </button>
+
+              <a href="{% url 'cursos:componente_lista' %}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

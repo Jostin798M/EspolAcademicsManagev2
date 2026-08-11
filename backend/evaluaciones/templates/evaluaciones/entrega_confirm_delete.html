@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Eliminar entrega — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card border-danger shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h4 text-danger mb-3">
+            <i class="bi-exclamation-triangle"></i> Eliminar entrega
+          </h1>
+
+          <p class="mb-1">Esta a punto de eliminar una entrega:</p>
+
+          <p class="fs-5 fw-semibold">{{ entrega.usuario.nombre_completo }} - {{ entrega.tarea.titulo }}</p>
+
+          <div class="alert alert-warning">
+            Se perdera el envio y la calificacion del estudiante.
+          </div>
+
+          <form method="post" class="d-flex flex-wrap gap-2">
+            {% csrf_token %}
+
+            <button type="submit" class="btn btn-danger">
+              <i class="bi-trash"></i> Confirmar eliminacion
+            </button>
+
+            <a href="{% url 'evaluaciones:entrega_lista' %}" class="btn btn-outline-secondary">
+              Cancelar
+            </a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

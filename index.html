@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EspolAcademicsManage — Iniciar sesion</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/components.css">
+  <script>
+    (function () {
+      const stored = localStorage.getItem("tema");
+      if (stored === "oscuro") {
+        document.documentElement.setAttribute("data-theme", "dark");
+      } else if (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+        document.documentElement.setAttribute("data-theme", "dark");
+      }
+      window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", e => {
+        if (!localStorage.getItem("tema")) {
+          if (e.matches) document.documentElement.setAttribute("data-theme", "dark");
+          else document.documentElement.removeAttribute("data-theme");
+        }
+      });
+    })();
+    function toggleLoginTheme() {
+      const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+      if (isDark) {
+        document.documentElement.removeAttribute("data-theme");
+        localStorage.setItem("tema", "claro");
+      } else {
+        document.documentElement.setAttribute("data-theme", "dark");
+        localStorage.setItem("tema", "oscuro");
+      }
+      const ic = document.getElementById("icono-tema-login");
+      if (ic) ic.className = isDark ? "bi-moon" : "bi-sun";
+    }
+  </script>
+  <style>
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: var(--color-bg);
+      padding: 24px;
+    }
+
+    .login-wrapper {
+      display: flex;
+      width: 100%;
+      max-width: 880px;
+      min-height: 520px;
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+    }
+
+    /* Panel izquierdo — branding */
+    .login-brand {
+      flex: 1;
+      background: linear-gradient(160deg, var(--color-primary) 0%, var(--color-secondary) 100%);
+      padding: 48px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      color: #FFFFFF;
+    }
+
+    .login-brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .login-brand-logo i { font-size: 2rem; }
+    .login-brand-logo strong {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      line-height: 1.2;
+    }
+    .login-brand-logo span {
+      display: block;
+      font-size: var(--font-size-xs);
+      opacity: 0.8;
+      font-weight: 400;
+    }
+
+    .login-brand-body h2 {
+      color: #FFFFFF;
+      font-size: var(--font-size-2xl);
+      margin-bottom: 12px;
+    }
+    .login-brand-body p {
+      color: rgba(255,255,255,0.75);
+      font-size: var(--font-size-sm);
+      line-height: 1.7;
+    }
+
+    .login-brand-features {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .login-feature {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: var(--font-size-sm);
+      color: rgba(255,255,255,0.85);
+    }
+    .login-feature i {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background-color: rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    /* Panel derecho — formulario */
+    .login-form-panel {
+      width: 380px;
+      background-color: var(--color-surface);
+      padding: 48px 40px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 24px;
+    }
+
+    .login-form-header h3 { margin-bottom: 4px; }
+    .login-form-header p  { font-size: var(--font-size-sm); margin: 0; }
+
+    .login-form { display: flex; flex-direction: column; gap: 16px; }
+
+    .input-icon-wrapper {
+      position: relative;
+    }
+    .input-icon-wrapper i {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-text-muted);
+      font-size: 1rem;
+      pointer-events: none;
+    }
+    .input-icon-wrapper .form-control { padding-left: 36px; }
+
+    .btn-login-full {
+      width: 100%;
+      padding: 11px;
+      font-size: var(--font-size-base);
+      justify-content: center;
+      border-radius: var(--radius-md);
+    }
+
+    .login-footer {
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--color-text-muted);
+    }
+
+    #error-form {
+      display: none;
+      font-size: var(--font-size-sm);
+    }
+
+    /* Credenciales de prueba */
+    .demo-credentials {
+      background-color: var(--color-primary-soft);
+      border-radius: var(--radius-md);
+      padding: 12px 14px;
+      font-size: var(--font-size-xs);
+    }
+    .demo-credentials strong {
+      display: block;
+      color: var(--color-primary);
+      margin-bottom: 6px;
+      font-size: var(--font-size-xs);
+    }
+    .demo-row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--color-text-secondary);
+      margin-bottom: 2px;
+    }
+    .demo-row span { color: var(--color-text-primary); font-weight: 500; }
+
+    @media (max-width: 768px) {
+      .login-brand { display: none; }
+      .login-form-panel { width: 100%; max-width: 420px; }
+      .login-wrapper { max-width: 420px; min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="login-wrapper page-enter">
+
+    <!-- Panel de branding -->
+    <div class="login-brand">
+      <div class="login-brand-logo">
+        <i class="bi-mortarboard-fill"></i>
+        <div>
+          <strong>EspolAcademics<br>Manage</strong>
+          <span>ESPOL — SOFG1006</span>
+        </div>
+      </div>
+
+      <div class="login-brand-body">
+        <h2>Gestion academica centralizada</h2>
+        <p>Plataforma para administrar cursos, modulos, tareas y calificaciones de forma eficiente para profesores y estudiantes de ESPOL.</p>
+      </div>
+
+      <div class="login-brand-features">
+        <div class="login-feature">
+          <i class="bi-book"></i>
+          <span>Cursos y modulos organizados</span>
+        </div>
+        <div class="login-feature">
+          <i class="bi-pencil-square"></i>
+          <span>Tareas y quizzes interactivos</span>
+        </div>
+        <div class="login-feature">
+          <i class="bi-graph-up-arrow"></i>
+          <span>Seguimiento de progreso en tiempo real</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel de formulario -->
+    <div class="login-form-panel">
+
+      <button onclick="toggleLoginTheme()" title="Cambiar tema"
+        style="position:absolute;top:16px;right:16px;background:none;border:none;cursor:pointer;
+               color:var(--color-text-muted);font-size:1.1rem;padding:6px 8px;
+               border-radius:var(--radius-md);transition:background var(--transition-fast);"
+        onmouseover="this.style.background='var(--color-border)'"
+        onmouseout="this.style.background='none'">
+        <i id="icono-tema-login" class="bi-moon"></i>
+      </button>
+
+      <div class="login-form-header">
+        <h3>Bienvenido</h3>
+        <p class="text-secondary">Ingresa tus credenciales para continuar</p>
+      </div>
+
+      <div id="error-form" class="alert alert-danger">
+        <i class="bi-exclamation-circle"></i>
+        <span id="error-form-msg"></span>
+      </div>
+
+      <div id="login-form" class="login-form">
+        <div class="form-group">
+          <label class="form-label" for="correo">
+            Correo institucional <span class="required">*</span>
+          </label>
+          <div class="input-icon-wrapper">
+            <i class="bi-envelope"></i>
+            <input type="email" id="correo" class="form-control"
+                   placeholder="usuario@espol.edu.ec" autocomplete="email">
+          </div>
+          <span id="error-correo" class="form-error" style="display:none"></span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">
+            Contrasena <span class="required">*</span>
+          </label>
+          <div class="input-icon-wrapper">
+            <i class="bi-lock"></i>
+            <input type="password" id="password" class="form-control"
+                   placeholder="••••••••" autocomplete="current-password">
+          </div>
+          <span id="error-password" class="form-error" style="display:none"></span>
+        </div>
+
+        <button id="btn-login" class="btn btn-primary btn-login-full" onclick="Auth.login()">
+          <i class="bi-box-arrow-in-right"></i> Ingresar
+        </button>
+      </div>
+
+      <!-- Credenciales de prueba -->
+      <div class="demo-credentials">
+        <strong><i class="bi-info-circle"></i> Credenciales de prueba</strong>
+        <div class="demo-row">SuperAdmin: <span>carlos.mendoza@espol.edu.ec / admin123</span></div>
+        <div class="demo-row">Admin: <span>maria.torres@espol.edu.ec / admin123</span></div>
+        <div class="demo-row">Profesor/Est: <span>roberto.llerena@espol.edu.ec / user123</span></div>
+      </div>
+
+      <div class="login-footer">
+        EspolAcademicsManage &copy; 2026 — ESPOL
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/data/mockdata.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/pages/auth.js"></script>
+  <script>
+    const ic = document.getElementById("icono-tema-login");
+    if (ic && document.documentElement.getAttribute("data-theme") === "dark") ic.className = "bi-sun";
+  </script>
+
+  <script>
+    /* Correccion del manejo de error-form para mostrar el span interno */
+    const _showError = Auth.showError.bind(Auth);
+    Auth.showError = function(id, mensaje) {
+      if (id === "error-form") {
+        const wrapper = document.getElementById("error-form");
+        const msg     = document.getElementById("error-form-msg");
+        if (wrapper && msg) { msg.textContent = mensaje; wrapper.style.display = "flex"; }
+      } else {
+        _showError(id, mensaje);
+        const input = document.querySelector(`#${id.replace("error-","")}`);
+        if (input) input.classList.add("is-invalid");
+      }
+    };
+    Auth.clearErrors = function() {
+      const wrapper = document.getElementById("error-form");
+      if (wrapper) wrapper.style.display = "none";
+      ["correo","password"].forEach(id => {
+        const el = document.getElementById(`error-${id}`);
+        if (el) { el.textContent = ""; el.style.display = "none"; }
+        const input = document.getElementById(id);
+        if (input) input.classList.remove("is-invalid");
+      });
+    };
+  </script>
+
+</body>
+</html>

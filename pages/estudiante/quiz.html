@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz — Estudiante</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Quiz</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <a id="btn-volver" href="#">Curso</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current" id="quiz-titulo-crumb">Quiz</span>
+        </nav>
+      </div>
+      <div class="topbar-right" style="gap:8px">
+        <!-- Timer (oculto si no hay limite de tiempo) -->
+        <div id="quiz-timer" style="display:none;align-items:center;gap:6px;padding:6px 12px;background:#FEF2F2;border-radius:8px;color:#991B1B;font-weight:600;font-size:.875rem;border:1px solid #FCA5A5">
+          <i class="bi-stopwatch"></i>
+          <span>--:--</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-content page-enter" style="max-width:760px">
+      <div class="page-header">
+        <div>
+          <h2 id="quiz-titulo">—</h2>
+          <p class="text-sm text-muted" id="quiz-descripcion"></p>
+          <span class="text-xs text-muted" id="quiz-preguntas"></span>
+        </div>
+        <a id="btn-volver-btn" href="#" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <!-- Preguntas o resultado -->
+      <div id="form-quiz">
+        <div id="preguntas-quiz"></div>
+        <div style="display:flex;justify-content:flex-end;margin-top:16px">
+          <button class="btn btn-primary" onclick="QuizEstudiante.enviar()">
+            <i class="bi-send"></i> Enviar quiz
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/estudiante.js"></script>
+<script>
+  QuizEstudiante.init();
+  document.getElementById("btn-volver-btn").href           = document.getElementById("btn-volver").href;
+  document.getElementById("quiz-titulo-crumb").textContent = document.getElementById("quiz-titulo").textContent;
+</script>
+</body>
+</html>

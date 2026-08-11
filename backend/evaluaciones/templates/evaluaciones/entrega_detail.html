@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de la entrega — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de la entrega</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'evaluaciones:entrega_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.id_entrega }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Tarea</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.tarea }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estudiante</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.usuario }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estado</dt>
+            <dd class="col-sm-8 pt-1">{% if entrega.estado == 'entregado' %}
+                  <span class="badge text-bg-success">Entregado</span>
+              {% else %}
+                  <span class="badge text-bg-secondary">Pendiente</span>
+              {% endif %}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Fecha de entrega</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.fecha|default:"Sin entregar" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Respuesta escrita</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.texto|default:"Sin texto" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Archivo</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.archivo|default:"Sin archivo" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Imagen</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.imagen|default:"Sin imagen" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Enlace</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.link|default:"Sin enlace" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Nota</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.nota|default:"Sin calificar" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Comentario</dt>
+            <dd class="col-sm-8 pt-1">{{ entrega.comentario|default:"Sin comentario" }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'evaluaciones:entrega_editar' entrega.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'evaluaciones:entrega_eliminar' entrega.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

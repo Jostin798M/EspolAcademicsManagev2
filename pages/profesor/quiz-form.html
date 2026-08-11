@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiz — Profesor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Quiz</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <a id="btn-volver" href="#">Curso</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current">Quiz</span>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header">
+        <h2>Configurar Quiz</h2>
+        <a id="btn-volver-btn" href="#" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <!-- Config general -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header"><h4>Configuracion General</h4></div>
+        <div class="card-body">
+          <div class="form-grid form-grid-2" style="gap:16px">
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">Titulo <span class="required">*</span></label>
+              <input type="text" id="q-titulo" class="form-control" placeholder="Ej: Quiz 1 — HTML Basico">
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">Descripcion</label>
+              <textarea id="q-descripcion" class="form-control" rows="2" placeholder="Instrucciones generales del quiz..."></textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Tiempo limite (minutos)</label>
+              <input type="number" id="q-tiempo" class="form-control" min="5" step="5" placeholder="Sin limite">
+              <p class="form-text">Deja vacio si no hay limite de tiempo.</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Fecha limite <span class="required">*</span></label>
+              <input type="datetime-local" id="q-limite" class="form-control">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Preguntas -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h4>Preguntas</h4>
+          <span class="text-xs text-muted">
+            <i class="bi-circle-fill" style="color:var(--color-success);font-size:.6rem"></i> Autocorregible
+            <i class="bi-circle-fill" style="color:var(--color-warning);font-size:.6rem;margin-left:8px"></i> Manual
+          </span>
+        </div>
+        <div class="card-body">
+          <div id="preguntas-container"></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('opcion_multiple_una')"><i class="bi-ui-radios"></i> Opcion multiple (1)</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('opcion_multiple_varias')"><i class="bi-ui-checks"></i> Opcion multiple (varias)</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('verdadero_falso')"><i class="bi-toggle-on"></i> V / F</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('completar_espacios')"><i class="bi-input-cursor-text"></i> Completar</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('respuesta_numerica')"><i class="bi-123"></i> Numerica</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('menu_desplegable')"><i class="bi-chevron-down"></i> Desplegable</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('ordenamiento')"><i class="bi-sort-numeric-down"></i> Ordenamiento</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('relacionar_columnas')"><i class="bi-arrow-left-right"></i> Relacionar</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('seleccion_imagen')"><i class="bi-image"></i> Hot spot</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('respuesta_corta')"><i class="bi-chat-left-text"></i> Respuesta corta</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('ensayo')"><i class="bi-journal-text"></i> Ensayo</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('subida_archivo')"><i class="bi-upload"></i> Archivo</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('respuesta_imagen')"><i class="bi-card-image"></i> Imagen</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('editor_codigo')"><i class="bi-code-slash"></i> Codigo</button>
+            <button class="btn btn-outline btn-sm" onclick="QuizForm.agregarPregunta('escala_valoracion')"><i class="bi-star"></i> Likert</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <a id="btn-cancelar" href="#" class="btn btn-ghost">Cancelar</a>
+        <button class="btn btn-primary" onclick="QuizForm.guardar()">
+          <i class="bi-floppy"></i> Guardar Quiz
+        </button>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/profesor.js"></script>
+<script>
+  QuizForm.init();
+  document.getElementById("btn-volver-btn").href = document.getElementById("btn-volver").href;
+  document.getElementById("btn-cancelar").href   = document.getElementById("btn-volver").href;
+</script>
+</body>
+</html>

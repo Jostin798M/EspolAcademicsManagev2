@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulario de Curso — Profesor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Curso</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current" id="form-titulo">Nuevo Curso</span>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header" style="align-items:center;display:flex;justify-content:space-between">
+        <h2 id="form-titulo-h2">Nuevo Curso</h2>
+        <a href="mis-cursos.html" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <div class="content-grid-2" style="gap:24px">
+        <!-- Datos del curso -->
+        <div style="display:flex;flex-direction:column;gap:20px">
+          <div class="card">
+            <div class="card-header"><h4>Informacion General</h4></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">Nombre del curso <span class="required">*</span></label>
+                <input type="text" id="c-nombre" class="form-control" placeholder="Ej: Desarrollo de Aplicaciones Web y Moviles">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Descripcion <span class="required">*</span></label>
+                <textarea id="c-descripcion" class="form-control" rows="3" placeholder="Descripcion del curso..."></textarea>
+              </div>
+              <div class="form-grid form-grid-2" style="gap:16px">
+                <div class="form-group">
+                  <label class="form-label">Facultad <span class="required">*</span></label>
+                  <select id="c-facultad" class="form-control"></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Codigo</label>
+                  <input type="text" id="c-codigo" class="form-control" readonly style="background:#F9FAFB;color:var(--color-text-muted)">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Fecha de inicio <span class="required">*</span></label>
+                  <input type="date" id="c-inicio" class="form-control">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Fecha de fin <span class="required">*</span></label>
+                  <input type="date" id="c-fin" class="form-control">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Formula de calificacion -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h4>Formula de Calificacion</h4>
+              <span class="text-xs text-muted">Debe sumar 100%</span>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info" style="margin-bottom:16px">
+                <i class="bi-info-circle"></i>
+                <span>Define los componentes de la nota final. Los porcentajes deben sumar exactamente 100%.</span>
+              </div>
+              <div id="formula-items" style="margin-bottom:12px"></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <span class="fw-semibold text-sm" id="formula-total" style="color:var(--color-danger)">Total: 0%</span>
+                <button class="btn btn-ghost btn-sm" onclick="CursoForm.agregarComponente()">
+                  <i class="bi-plus"></i> Agregar componente
+                </button>
+              </div>
+              <hr style="margin:16px 0;border-color:var(--color-border)">
+              <button class="btn btn-primary" style="width:100%" onclick="CursoForm.guardar()">
+                <i class="bi-floppy"></i> Guardar Curso
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/profesor.js"></script>
+<script>CursoForm.init();</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tarea — Profesor</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Tarea</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <a id="btn-volver" href="#">Gestion del Curso</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current">Tarea</span>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header">
+        <h2>Tarea</h2>
+        <a id="btn-volver-btn" href="#" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <div style="max-width:680px">
+        <div class="card">
+          <div class="card-header"><h4>Configuracion de la Tarea</h4></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label class="form-label">Titulo <span class="required">*</span></label>
+              <input type="text" id="t-titulo" class="form-control" placeholder="Ej: Proyecto HTML — Pagina personal">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Descripcion / Enunciado <span class="required">*</span></label>
+              <textarea id="t-descripcion" class="form-control" rows="5" placeholder="Instrucciones detalladas de la tarea..."></textarea>
+            </div>
+            <div class="form-grid form-grid-2" style="gap:16px">
+              <div class="form-group">
+                <label class="form-label">Fecha limite <span class="required">*</span></label>
+                <input type="datetime-local" id="t-limite" class="form-control">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Puntaje maximo <span class="required">*</span></label>
+                <input type="number" id="t-puntaje" class="form-control" min="1" max="100" step="0.5" placeholder="100">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Criterios de evaluacion</label>
+              <textarea id="t-criterios" class="form-control" rows="3" placeholder="Ej: Codigo limpio (30%), Funcionalidad (40%), Presentacion (30%)..."></textarea>
+              <p class="form-text">Rubrica o criterios visibles para el estudiante al momento de entregar.</p>
+            </div>
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
+              <a id="btn-cancelar" href="#" class="btn btn-ghost">Cancelar</a>
+              <button class="btn btn-primary" onclick="TareaForm.guardar()">
+                <i class="bi-floppy"></i> Guardar Tarea
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/profesor.js"></script>
+<script>
+  TareaForm.init();
+  document.getElementById("btn-volver-btn").href = document.getElementById("btn-volver").href;
+  document.getElementById("btn-cancelar").href   = document.getElementById("btn-volver").href;
+</script>
+</body>
+</html>

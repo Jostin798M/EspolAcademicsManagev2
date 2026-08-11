@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+{% load l10n %}
+
+{% block title %}Reportes academicos — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Reportes academicos</h1>
+      <p class="text-body-secondary mb-0">
+        Indicadores generados el {{ generado|date:"d/m/Y H:i" }}.
+      </p>
+    </div>
+
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'reportes:exportar_csv' %}?facultad={{ facultad_seleccionada|default:'' }}&estado={{ estado_seleccionado|default:'' }}"
+         class="btn btn-success">
+        <i class="bi-file-earmark-spreadsheet"></i> Exportar CSV
+      </a>
+
+      <a href="{% url 'reportes:exportar_pdf' %}?facultad={{ facultad_seleccionada|default:'' }}&estado={{ estado_seleccionado|default:'' }}"
+         class="btn btn-danger" target="_blank" rel="noopener">
+        <i class="bi-file-earmark-pdf"></i> Exportar PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- ── Filtros ── -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <form method="get" class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" for="facultad">Facultad</label>
+          <select class="form-select" name="facultad" id="facultad">
+            <option value="">Todas las facultades</option>
+            {% for f in facultades %}
+              <option value="{{ f.pk }}" {% if facultad_seleccionada == f.pk|stringformat:"s" %}selected{% endif %}>
+                {{ f.codigo }} — {{ f.nombre }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4">
+          <label class="form-label" for="estado">Estado del curso</label>
+          <select class="form-select" name="estado" id="estado">
+            <option value="">Todos los estados</option>
+            {% for valor, etiqueta in estados_disponibles %}
+              <option value="{{ valor }}" {% if estado_seleccionado == valor %}selected{% endif %}>
+                {{ etiqueta }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-4 d-flex gap-2">
+          <button type="submit" class="btn btn-primary flex-fill">
+            <i class="bi-funnel"></i> Aplicar filtros
+          </button>
+
+          <a href="{% url 'reportes:tablero' %}" class="btn btn-outline-secondary">
+            Limpiar
+          </a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Indicadores ── -->
+  <div class="row g-3 mb-4">
+    {% with r=resumen %}
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="text-body-secondary small text-uppercase">Cursos</div>
+            <div class="fs-2 fw-bold">{{ r.total_cursos }}</div>
+            <div class="small text-body-secondary">{{ r.cursos_activos }} activos</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="text-body-secondary small text-uppercase">Estudiantes</div>
+            <div class="fs-2 fw-bold">{{ r.total_estudiantes }}</div>
+            <div class="small text-body-secondary">inscritos</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="text-body-secondary small text-uppercase">Tasa de entrega</div>
+            <div class="fs-2 fw-bold">{{ r.tasa_entrega }}%</div>
+            <div class="progress mt-2" style="height:6px">
+              <div class="progress-bar" style="width: {{ r.tasa_entrega|unlocalize }}%"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="card shadow-sm h-100">
+          <div class="card-body">
+            <div class="text-body-secondary small text-uppercase">Promedio general</div>
+            <div class="fs-2 fw-bold">
+              {% if r.promedio_general %}{{ r.promedio_general }}{% else %}—{% endif %}
+            </div>
+            <div class="small {% if r.pendientes_calificar %}text-warning{% else %}text-body-secondary{% endif %}">
+              {{ r.pendientes_calificar }} por calificar
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endwith %}
+  </div>
+
+  <!-- ── Graficos ── -->
+  <div class="row g-3 mb-4">
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-transparent">
+          <h2 class="h6 mb-0">Estudiantes por facultad</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoFacultades" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-transparent">
+          <h2 class="h6 mb-0">Promedio de notas por curso</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoPromedios" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-transparent">
+          <h2 class="h6 mb-0">Estado de las entregas</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoEntregas" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="card shadow-sm h-100">
+        <div class="card-header bg-transparent">
+          <h2 class="h6 mb-0">Cursos activos y archivados</h2>
+        </div>
+        <div class="card-body">
+          <canvas id="graficoEstados" height="220"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Avance por estudiante ── -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-transparent">
+      <h2 class="h6 mb-0">Avance de modulos por estudiante</h2>
+    </div>
+
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Estudiante</th>
+              <th>Curso</th>
+              <th>Modulos</th>
+              <th style="min-width:160px">Avance</th>
+              <th>Promedio</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for fila in avance %}
+              <tr>
+                <td>
+                  {{ fila.estudiante }}
+                  <div class="small text-body-secondary">{{ fila.correo }}</div>
+                </td>
+                <td><span class="badge text-bg-primary">{{ fila.curso }}</span></td>
+                <td>{{ fila.modulos_completados }} / {{ fila.modulos_totales }}</td>
+                <td>
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="progress flex-fill" style="height:8px">
+                      <div class="progress-bar {% if fila.avance >= 70 %}bg-success{% elif fila.avance >= 40 %}bg-warning{% else %}bg-danger{% endif %}"
+                           style="width: {{ fila.avance|unlocalize }}%"></div>
+                    </div>
+                    <span class="small text-body-secondary">{{ fila.avance }}%</span>
+                  </div>
+                </td>
+                <td>
+                  {% if fila.promedio %}
+                    {{ fila.promedio }}
+                  {% else %}
+                    <span class="text-body-secondary">Sin nota</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center text-body-secondary py-4">
+                  No hay estudiantes inscritos con los filtros aplicados.
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  {{ datos_graficos|json_script:"datos-graficos" }}
+
+  <script>
+    (function () {
+      const datos = JSON.parse(document.getElementById("datos-graficos").textContent);
+      const esOscuro = document.documentElement.getAttribute("data-bs-theme") === "dark";
+
+      Chart.defaults.color = esOscuro ? "#adb5bd" : "#6c757d";
+      Chart.defaults.borderColor = esOscuro ? "#343a40" : "#dee2e6";
+      Chart.defaults.font.family = "system-ui, -apple-system, 'Segoe UI', sans-serif";
+
+      const paleta = ["#0d6efd", "#198754", "#ffc107", "#dc3545", "#6f42c1", "#20c997"];
+      const sinLeyenda = { plugins: { legend: { display: false } }, responsive: true, maintainAspectRatio: false };
+
+      new Chart(document.getElementById("graficoFacultades"), {
+        type: "bar",
+        data: {
+          labels: datos.facultades.etiquetas,
+          datasets: [{ data: datos.facultades.valores, backgroundColor: paleta[0], borderRadius: 6 }]
+        },
+        options: { ...sinLeyenda, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+
+      new Chart(document.getElementById("graficoPromedios"), {
+        type: "bar",
+        data: {
+          labels: datos.promedios.etiquetas,
+          datasets: [{ data: datos.promedios.valores, backgroundColor: paleta[1], borderRadius: 6 }]
+        },
+        options: { ...sinLeyenda, scales: { y: { beginAtZero: true, suggestedMax: 10 } } }
+      });
+
+      new Chart(document.getElementById("graficoEntregas"), {
+        type: "doughnut",
+        data: {
+          labels: datos.entregas.etiquetas,
+          datasets: [{ data: datos.entregas.valores, backgroundColor: [paleta[1], paleta[2], paleta[3]] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+      });
+
+      new Chart(document.getElementById("graficoEstados"), {
+        type: "pie",
+        data: {
+          labels: datos.estados_curso.etiquetas,
+          datasets: [{ data: datos.estados_curso.valores, backgroundColor: [paleta[1], paleta[2]] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } }
+      });
+    })();
+  </script>
+{% endblock %}

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — SuperAdmin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+
+  <div id="sidebar-container"></div>
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Dashboard</span>
+        <nav class="breadcrumb"><span class="current">Inicio</span></nav>
+      </div>
+      <div class="topbar-right">
+        <span class="text-sm text-muted" id="fecha-hoy"></span>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+
+      <!-- KPIs -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-icon primary"><i class="bi-people"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-value" id="kpi-usuarios">—</div>
+            <div class="kpi-label">Usuarios totales</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon success"><i class="bi-book"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-value" id="kpi-cursos">—</div>
+            <div class="kpi-label">Cursos activos</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon secondary"><i class="bi-building"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-value" id="kpi-facultades">—</div>
+            <div class="kpi-label">Facultades</div>
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-icon warning"><i class="bi-graph-up"></i></div>
+          <div class="kpi-info">
+            <div class="kpi-value" id="kpi-tasa">—</div>
+            <div class="kpi-label">Tasa de aprobacion global</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tabla resumen facultades -->
+      <div class="card">
+        <div class="card-header">
+          <h4><i class="bi-building text-primary"></i> Resumen por Facultad</h4>
+          <a href="facultades.html" class="btn btn-ghost btn-sm">Ver todas <i class="bi-arrow-right"></i></a>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="lista-facultades-mobile" class="mobile-cards" style="padding:16px"></div>
+          <div class="table-container" style="border:none;border-radius:0;box-shadow:none">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Codigo</th>
+                  <th>Facultad</th>
+                  <th>Admin asignado</th>
+                  <th>Cursos</th>
+                </tr>
+              </thead>
+              <tbody id="tabla-facultades">
+                <tr><td colspan="4"><div class="empty-state"><i class="bi-building"></i><p>Cargando...</p></div></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/superadmin.js"></script>
+<script>
+  document.getElementById("fecha-hoy").textContent =
+    new Date().toLocaleDateString("es-EC", { weekday:"long", day:"numeric", month:"long", year:"numeric" });
+  Dashboard.init();
+</script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Eliminar material — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-7">
+      <div class="card border-danger shadow-sm">
+        <div class="card-body p-4">
+          <h1 class="h4 text-danger mb-3">
+            <i class="bi-exclamation-triangle"></i> Eliminar material
+          </h1>
+
+          <p class="mb-1">Esta a punto de eliminar un material:</p>
+
+          <p class="fs-5 fw-semibold">{{ material.titulo }}</p>
+
+          <div class="alert alert-warning">
+            El recurso dejara de estar disponible para los estudiantes.
+          </div>
+
+          <form method="post" class="d-flex flex-wrap gap-2">
+            {% csrf_token %}
+
+            <button type="submit" class="btn btn-danger">
+              <i class="bi-trash"></i> Confirmar eliminacion
+            </button>
+
+            <a href="{% url 'cursos:material_lista' %}" class="btn btn-outline-secondary">
+              Cancelar
+            </a>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

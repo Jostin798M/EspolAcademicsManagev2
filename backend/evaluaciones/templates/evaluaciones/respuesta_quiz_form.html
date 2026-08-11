@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_pagina }} — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="mb-4">
+        <h1 class="h3 mb-1">{{ titulo_pagina }}</h1>
+        <p class="text-body-secondary mb-0">Los campos marcados con <strong>*</strong> son obligatorios.</p>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger">
+                {% for error in form.non_field_errors %}
+                  <div>{{ error }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.quiz.id_for_label }}">
+                {{ form.quiz.label }}
+              </label>
+
+              {{ form.quiz }}
+
+              {% if form.quiz.help_text %}
+                <div class="form-text">{{ form.quiz.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.quiz.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label campo-obligatorio" for="{{ form.usuario.id_for_label }}">
+                {{ form.usuario.label }}
+              </label>
+
+              {{ form.usuario }}
+
+              {% if form.usuario.help_text %}
+                <div class="form-text">{{ form.usuario.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.usuario.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.respuestas.id_for_label }}">
+                {{ form.respuestas.label }}
+              </label>
+
+              {{ form.respuestas }}
+
+              {% if form.respuestas.help_text %}
+                <div class="form-text">{{ form.respuestas.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.respuestas.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.nota_automatica.id_for_label }}">
+                {{ form.nota_automatica.label }}
+              </label>
+
+              {{ form.nota_automatica }}
+
+              {% if form.nota_automatica.help_text %}
+                <div class="form-text">{{ form.nota_automatica.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.nota_automatica.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="{{ form.nota_manual.id_for_label }}">
+                {{ form.nota_manual.label }}
+              </label>
+
+              {{ form.nota_manual }}
+
+              {% if form.nota_manual.help_text %}
+                <div class="form-text">{{ form.nota_manual.help_text }}</div>
+              {% endif %}
+
+              {% for error in form.nota_manual.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary">
+                <i class="bi-check-lg"></i> {{ texto_boton }}
+              </button>
+
+              <a href="{% url 'evaluaciones:respuesta_lista' %}" class="btn btn-outline-secondary">
+                Cancelar
+              </a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

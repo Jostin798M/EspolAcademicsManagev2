@@ -1,0 +1,10 @@
+# Dependencias del servidor (AlwaysData).
+#   pip install -r requirements-produccion.txt
+-r requirements.txt
+
+# Driver MySQL recomendado por Django.
+mysqlclient==2.2.8
+
+# Alternativa 100% Python si mysqlclient no compila en el servidor.
+# Para activarla, define DB_DRIVER=pymysql en backend/.env
+PyMySQL==1.1.2

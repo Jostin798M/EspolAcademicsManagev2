@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de el modulo — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de el modulo</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'cursos:modulo_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.id_modulo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Curso</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.curso }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Orden</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.orden }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Titulo</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.titulo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Descripcion</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.descripcion|default:"Sin descripcion" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Materiales</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.materiales.count }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estudiantes con progreso</dt>
+            <dd class="col-sm-8 pt-1">{{ modulo.progresos.count }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'cursos:modulo_editar' modulo.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'cursos:modulo_eliminar' modulo.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

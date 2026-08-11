@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tarea — Estudiante</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="../../css/main.css">
+  <link rel="stylesheet" href="../../css/components.css">
+  <link rel="stylesheet" href="../../css/dashboard.css">
+</head>
+<body>
+<div class="app-layout">
+  <div id="sidebar-container"></div>
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="btn-menu-toggle" id="btn-menu-toggle"><i class="bi-list"></i></button>
+        <span class="topbar-title" id="topbar-title">Tarea</span>
+        <nav class="breadcrumb">
+          <a href="mis-cursos.html">Mis Cursos</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <a id="btn-volver" href="#">Curso</a>
+          <i class="bi-chevron-right text-xs"></i>
+          <span class="current" id="tarea-titulo-crumb">Tarea</span>
+        </nav>
+      </div>
+    </header>
+
+    <main class="page-content page-enter">
+      <div class="page-header">
+        <h2 id="tarea-titulo">—</h2>
+        <a id="btn-volver-btn" href="#" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> Volver</a>
+      </div>
+
+      <div class="content-grid-2" style="gap:24px">
+
+        <!-- Descripcion y criterios -->
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="card">
+            <div class="card-header">
+              <h4><i class="bi-file-text text-primary"></i> Descripcion</h4>
+              <div style="display:flex;gap:12px">
+                <span class="text-sm text-muted"><i class="bi-clock"></i> <span id="tarea-limite"></span></span>
+                <span class="badge badge-primary" id="tarea-puntaje"></span>
+              </div>
+            </div>
+            <div class="card-body">
+              <p class="text-sm" id="tarea-descripcion" style="line-height:1.7"></p>
+            </div>
+          </div>
+
+          <!-- Criterios (oculto si no hay) -->
+          <div class="card" style="display:none">
+            <div class="card-header"><h4><i class="bi-list-check text-secondary"></i> Criterios de evaluacion</h4></div>
+            <div class="card-body">
+              <p class="text-sm" id="tarea-criterios" style="white-space:pre-wrap;line-height:1.7"></p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Entrega -->
+        <div>
+          <div class="card">
+            <div class="card-header"><h4><i class="bi-upload text-success"></i> Tu entrega</h4></div>
+            <div class="card-body" id="form-entrega">
+              <div class="form-group">
+                <label class="form-label">Tipo de entrega</label>
+                <select id="tipo-entrega" class="form-control" onchange="TareaEstudiante.cambiarTipo(this.value)">
+                  <option value="texto">Texto</option>
+                  <option value="link">Enlace / URL</option>
+                  <option value="archivo">Nombre de archivo</option>
+                </select>
+              </div>
+              <div id="campo-texto">
+                <div class="form-group">
+                  <label class="form-label">Respuesta</label>
+                  <textarea id="entrega-texto" class="form-control" rows="6" placeholder="Escribe tu respuesta aqui..."></textarea>
+                </div>
+              </div>
+              <div id="campo-link" style="display:none">
+                <div class="form-group">
+                  <label class="form-label">URL del proyecto / repositorio</label>
+                  <input type="url" id="entrega-link" class="form-control" placeholder="https://github.com/...">
+                </div>
+              </div>
+              <div id="campo-archivo" style="display:none">
+                <div class="form-group">
+                  <label class="form-label">Nombre del archivo</label>
+                  <input type="text" id="entrega-archivo" class="form-control" placeholder="proyecto_final.zip">
+                  <p class="form-text">En la version con backend podras subir archivos directamente.</p>
+                </div>
+              </div>
+              <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="TareaEstudiante.entregar()">
+                <i class="bi-send"></i> Enviar entrega
+              </button>
+            </div>
+          </div>
+          <div style="margin-top:8px">
+            <div class="alert alert-info">
+              <i class="bi-info-circle"></i>
+              <span>Puedes modificar tu entrega hasta la fecha limite.</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="../../js/data/mockdata.js"></script>
+<script src="../../js/api.js"></script>
+<script src="../../js/components/sidebar.js"></script>
+<script src="../../js/pages/auth.js"></script>
+<script src="../../js/pages/estudiante.js"></script>
+<script>
+  TareaEstudiante.init();
+  document.getElementById("btn-volver-btn").href           = document.getElementById("btn-volver").href;
+  document.getElementById("tarea-titulo-crumb").textContent= document.getElementById("tarea-titulo").textContent;
+</script>
+</body>
+</html>

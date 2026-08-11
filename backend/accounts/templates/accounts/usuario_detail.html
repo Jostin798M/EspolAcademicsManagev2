@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle de el usuario — ESPOL Academics{% endblock %}
+
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-xl-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mb-4">
+        <div>
+          <h1 class="h3 mb-1">Detalle de el usuario</h1>
+          <p class="text-body-secondary mb-0">Informacion completa del registro.</p>
+        </div>
+
+        <a href="{% url 'accounts:usuario_lista' %}" class="btn btn-outline-secondary">
+          <i class="bi-arrow-left"></i> Volver
+        </a>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body p-4">
+          <dl class="row mb-0">
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificador</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.id_usuario }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Nombres</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.nombres }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Apellidos</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.apellidos }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Identificacion</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.identificacion }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Telefono</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.telefono|default:"No registrado" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Celular</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.celular }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Correo</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.correo }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Direccion</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.direccion|default:"No registrada" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estado civil</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.get_estado_civil_display }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Facultad</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.facultad|default:"Sin asignar" }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Rol del sistema</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.get_rol_display }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Estado</dt>
+            <dd class="col-sm-8 pt-1">{% if usuario_registro.estado == 'activo' %}
+                  <span class="badge text-bg-success">Activo</span>
+              {% else %}
+                  <span class="badge text-bg-secondary">Inactivo</span>
+              {% endif %}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Fecha de registro</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.fecha_registro }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Cursos que dicta</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.cursos_como_profesor.count }}</dd>
+            <dt class="col-sm-4 detalle-lbl text-body-secondary fw-semibold pt-2">Inscripciones</dt>
+            <dd class="col-sm-8 pt-1">{{ usuario_registro.inscripciones.count }}</dd>
+          </dl>
+        </div>
+
+        <div class="card-footer d-flex flex-wrap gap-2 py-3">
+          <a href="{% url 'accounts:usuario_editar' usuario_registro.pk %}" class="btn btn-sm btn-warning">
+            <i class="bi-pencil"></i> Editar
+          </a>
+
+          <a href="{% url 'accounts:usuario_eliminar' usuario_registro.pk %}" class="btn btn-sm btn-danger">
+            <i class="bi-trash"></i> Eliminar
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,25 @@
+# Entorno virtual (es especifico de cada sistema operativo; no se comparte)
+backend/venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Django
+backend/staticfiles/
+backend/db.sqlite3
+*.log
+
+# Configuracion sensible del servidor
+backend/.env
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Artefactos de Windows/WSL
+*:Zone.Identifier
