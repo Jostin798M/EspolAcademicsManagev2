@@ -107,6 +107,30 @@ Copia el resultado (una cadena larga) — la usarás en el Paso 5.
 
 ---
 
+## Vía rápida: el script automático
+
+Los Pasos 3 a 6 están automatizados en `desplegar.sh`. En el servidor (SSH o la
+consola web `https://ssh-jostin.alwaysdata.net`), pega estas dos líneas:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Jostin798M/EspolAcademicsManagev2/main/desplegar.sh -o ~/desplegar.sh
+bash ~/desplegar.sh
+```
+
+El script hace, en este orden: `git clone` en `~/www` → entorno virtual →
+dependencias → genera la clave secreta de Django y te **pide la contraseña de
+MySQL** para escribir el `.env` → `migrate` → datos de prueba → te pide crear el
+**superusuario**. Al terminar imprime los valores exactos para el Paso 7.
+
+Se puede volver a ejecutar cuantas veces quieras: si algo ya existe, lo
+reutiliza en vez de duplicarlo. **No** configura el sitio en el panel: los Pasos
+7 y 8 los haces tú.
+
+> El resto de esta guía explica lo mismo paso a paso, por si prefieres hacerlo a
+> mano o necesitas entender qué falló.
+
+---
+
 ## Paso 3. Subir el proyecto
 
 Tienes tres formas. **Elige una.**
@@ -200,7 +224,7 @@ ssh jostin@ssh-jostin.alwaysdata.net
 Ya dentro del servidor, mira qué versiones de Python hay disponibles:
 
 ```bash
-ls /usr/local/alwaysdata/python/
+ls /usr/alwaysdata/python/
 ```
 
 Este proyecto usa **Django 6.0, que necesita Python 3.12 o superior**.
@@ -209,7 +233,7 @@ Elige la versión más alta que aparezca (por ejemplo `3.13`) y créate el entor
 ```bash
 cd ~/www/EspolAcademicsManagev2/backend
 
-/usr/local/alwaysdata/python/3.13/bin/python3 -m venv ~/venv-espol
+/usr/alwaysdata/python/3.13/bin/python3 -m venv ~/venv-espol
 source ~/venv-espol/bin/activate
 
 python --version          # debe decir 3.12.x o superior
@@ -463,7 +487,7 @@ rsync -avz --exclude 'venv/' --exclude '__pycache__/' --exclude '.git/' \
 
 # En el servidor
 ssh jostin@ssh-jostin.alwaysdata.net
-/usr/local/alwaysdata/python/3.13/bin/python3 -m venv ~/venv-espol
+/usr/alwaysdata/python/3.13/bin/python3 -m venv ~/venv-espol
 source ~/venv-espol/bin/activate
 cd ~/www/EspolAcademicsManagev2/backend
 pip install -r requirements-produccion.txt
