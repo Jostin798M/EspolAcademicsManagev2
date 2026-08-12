@@ -70,12 +70,23 @@ def _validar_clave(request, privado):
         )
 
 
-def endpoint(privado=False):
+def esta_autenticado(request):
+    """True si no hace falta clave o si la recibida es correcta."""
+    configurada = getattr(settings, 'API_CLAVE', '')
+
+    return not configurada or clave_recibida(request) == configurada
+
+
+def endpoint(privado=False, abierto=False):
     """
     Decorador de las vistas de la API.
 
     Acepta solo GET, valida la clave y convierte cualquier error
     (incluido un 404) en una respuesta JSON coherente.
+
+    abierto=True omite la clave: se usa en los recursos que no devuelven
+    datos del sistema (el indice y la comprobacion de salud), para que
+    cualquiera pueda descubrir la API desde el navegador.
     """
     def decorador(vista):
         @functools.wraps(vista)
@@ -84,7 +95,9 @@ def endpoint(privado=False):
                 return error(f'Metodo {request.method} no permitido. Usa GET.', 405)
 
             try:
-                _validar_clave(request, privado)
+                if not abierto:
+                    _validar_clave(request, privado)
+
                 return vista(request, *args, **kwargs)
             except ErrorApi as exc:
                 return error(exc.mensaje, exc.codigo)

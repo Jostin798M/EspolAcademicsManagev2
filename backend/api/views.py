@@ -19,7 +19,7 @@ from cursos.models import Curso, Facultad, Inscripcion, Modulo
 from evaluaciones.models import Quiz, Tarea
 from reportes import servicios
 
-from .respuestas import ErrorApi, endpoint, ok, paginar
+from .respuestas import ErrorApi, endpoint, esta_autenticado, ok, paginar
 from .serializadores import (
     curso_detalle_json,
     curso_json,
@@ -48,9 +48,16 @@ def _curso(codigo):
 
 # ── Descubrimiento ───────────────────────────────────────────────────────────
 
-@endpoint()
+@endpoint(abierto=True)
 def indice(request):
-    """Lista los recursos disponibles: es la portada de la API."""
+    """
+    Lista los recursos disponibles: es la portada de la API.
+
+    No pide clave aunque este configurada. No devuelve ningun dato del
+    sistema y es lo primero que abre quien la va a usar.
+    """
+    autenticado = esta_autenticado(request)
+
     return ok({
         'nombre': 'API ESPOL Academics',
         'version': VERSION,
@@ -58,7 +65,15 @@ def indice(request):
         'metodos': ['GET'],
         'autenticacion': {
             'requerida': bool(settings.API_CLAVE),
+            'autenticado': autenticado,
             'como': 'Encabezado X-API-Key: <clave>  (o ?clave=<clave>)',
+            'ejemplo_curl': (
+                'curl -H "X-API-Key: TU_CLAVE" '
+                + request.build_absolute_uri(reverse('api:cursos'))
+            ),
+            'ejemplo_navegador': (
+                request.build_absolute_uri(reverse('api:cursos')) + '?clave=TU_CLAVE'
+            ),
         },
         'paginacion': {
             'parametros': ['pagina', 'tam'],
@@ -89,9 +104,14 @@ def indice(request):
     })
 
 
-@endpoint()
+@endpoint(abierto=True)
 def estado(request):
-    """Comprobacion de salud: sirve para monitorear el servicio."""
+    """
+    Comprobacion de salud: sirve para monitorear el servicio.
+
+    Responde sin clave para que cualquier monitor pueda consultarlo, pero
+    los totales solo se muestran a quien la envia.
+    """
     try:
         with connection.cursor() as cursor:
             cursor.execute('SELECT 1')
@@ -100,19 +120,23 @@ def estado(request):
     except Exception:
         base_ok = False
 
-    return ok({
+    datos = {
         'servicio': 'ESPOL Academics API',
         'version': VERSION,
         'base_de_datos': 'ok' if base_ok else 'sin conexion',
         'motor': connection.vendor,
-        'totales': {
+    }
+
+    if base_ok and esta_autenticado(request):
+        datos['totales'] = {
             'facultades': Facultad.objects.count(),
             'cursos': Curso.objects.count(),
             'modulos': Modulo.objects.count(),
             'tareas': Tarea.objects.count(),
             'quizzes': Quiz.objects.count(),
-        } if base_ok else None,
-    })
+        }
+
+    return ok(datos)
 
 
 # ── Facultades ───────────────────────────────────────────────────────────────

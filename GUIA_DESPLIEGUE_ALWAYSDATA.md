@@ -460,10 +460,15 @@ Características:
 
 ### Cómo se autentica
 
-| Situación | Recursos públicos (facultades, cursos, módulos, tareas, quizzes, reportes) | Recursos con datos personales (`usuarios`, `estudiantes`) |
-|---|---|---|
-| `API_CLAVE` **con valor** en `.env` | Piden la clave | Piden la clave |
-| `API_CLAVE` **vacía** | Abiertos a cualquiera | Deshabilitados (responden `503`) |
+| Situación | `/api/` y `/api/estado/` | Recursos de datos (facultades, cursos, módulos, tareas, quizzes, reportes) | Datos personales (`usuarios`, `estudiantes`) |
+|---|---|---|---|
+| `API_CLAVE` **con valor** en `.env` | Abiertos | Piden la clave | Piden la clave |
+| `API_CLAVE` **vacía** | Abiertos | Abiertos a cualquiera | Deshabilitados (responden `503`) |
+
+`/api/` y `/api/estado/` nunca piden clave: el índice no devuelve datos del
+sistema y el estado sirve para monitorear el servicio (sus totales sí se
+ocultan si no envías la clave). Así, al abrir `https://jostin.alwaysdata.net/api/`
+en el navegador ves la lista de recursos y cómo autenticarte, en vez de un `401`.
 
 La clave se envía de dos formas:
 
@@ -473,6 +478,19 @@ curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/cursos/
 
 # alternativa (útil para probar desde la barra del navegador)
 curl "https://jostin.alwaysdata.net/api/cursos/?clave=TU_CLAVE"
+```
+
+Un navegador no puede enviar encabezados al escribir una dirección, así que
+**para mirarla desde el navegador usa `?clave=`**:
+
+```
+https://jostin.alwaysdata.net/api/cursos/?clave=TU_CLAVE
+```
+
+Si no recuerdas la clave, está en el servidor:
+
+```bash
+grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env
 ```
 
 ### Recursos disponibles
@@ -659,7 +677,8 @@ python manage.py collectstatic --noinput
 | **`ModuleNotFoundError: No module named 'config'`** | El *Working directory* del sitio no apunta a `.../EspolAcademicsManagev2/backend`. Corrígelo en el Paso 7. |
 | **`SyntaxError` o `Django requires Python 3.12`** | El entorno virtual se creó con una versión vieja de Python. Bórralo (`rm -rf ~/venv-espol`) y repite el Paso 4 con una versión más alta, o baja a `Django==5.2.11`. |
 | **La página queda en blanco tras un cambio** | Falta reiniciar el sitio en el panel. |
-| **`/api/` responde `401`** | Falta el encabezado `X-API-Key` o la clave no coincide con `API_CLAVE` del `.env`. Compruébala con `grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env`. |
+| **`401` al abrir la API en el navegador** | Es lo esperado en los recursos de datos: el navegador no envía encabezados. Añade `?clave=TU_CLAVE` a la dirección, o usa `curl -H "X-API-Key: ..."`. El índice `/api/` sí abre sin clave. |
+| **`401` con la clave puesta** | No coincide con `API_CLAVE` del `.env`, o el `.env` cambió y falta reiniciar el sitio. Compruébala con `grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env`. |
 | **`/api/usuarios/` responde `503`** | `API_CLAVE` está vacía en el `.env`. Ponle un valor y reinicia el sitio. |
 | **`/api/` devuelve HTML en vez de JSON** | La ruta `path('api/', include('api.urls'))` quedó **después** del `re_path` que sirve el frontend en `config/urls.py`, o falta `'api'` en `INSTALLED_APPS`. |
 | **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. |

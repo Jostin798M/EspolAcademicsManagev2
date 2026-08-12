@@ -143,6 +143,25 @@ class ApiConClaveTest(ApiBaseTest):
 
         self.assertEqual(respuesta.status_code, 401)
 
+    def test_el_indice_no_pide_clave(self):
+        respuesta = self.client.get(reverse('api:indice'))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(self.cuerpo(respuesta)['datos']['autenticacion']['autenticado'])
+
+    def test_el_estado_no_pide_clave_pero_oculta_los_totales(self):
+        cuerpo = self.cuerpo(self.client.get(reverse('api:estado')))
+
+        self.assertTrue(cuerpo['ok'])
+        self.assertNotIn('totales', cuerpo['datos'])
+
+    def test_el_estado_muestra_los_totales_con_clave(self):
+        cuerpo = self.cuerpo(self.client.get(
+            reverse('api:estado'), headers={'x-api-key': 'clave-secreta-de-prueba'},
+        ))
+
+        self.assertEqual(cuerpo['datos']['totales']['cursos'], 1)
+
     def test_clave_incorrecta_devuelve_401(self):
         respuesta = self.client.get(
             reverse('api:cursos'), headers={'x-api-key': 'otra'},
