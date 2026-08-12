@@ -61,30 +61,53 @@ done
 [ -n "$PYBASE" ] || morir "No encuentro los Python de AlwaysData. Revisa: ls /usr/alwaysdata/python/"
 nota "Pythons disponibles en $PYBASE"
 
+# Ojo con "set -e": una tuberia que no encuentra nada devuelve 1 y matarIa el
+# script en la asignacion. Por eso todas llevan "|| true" y el valor se
+# comprueba despues.
 DISPONIBLES="$(ls "$PYBASE" 2>/dev/null \
     | grep -E '^3\.[0-9]+$' \
     | awk -F. '$2 >= 12' \
-    | sort -V)"
+    | sort -V || true)"
 [ -n "$DISPONIBLES" ] || morir "Este servidor no ofrece Python 3.12+. Django 6.0 lo necesita."
+nota "Versiones utiles: $(printf '%s' "$DISPONIBLES" | tr '\n' ' ')"
+
+hay_version() {
+    printf '%s\n' "$DISPONIBLES" | grep -qx "$1"
+}
 
 # La version tiene que ser LA MISMA que la del sitio en el panel: uWSGI arranca
 # con ese interprete y busca los paquetes en venv/lib/pythonX.Y/. Si no coincide,
 # el log dice "ModuleNotFoundError: No module named 'django'" aunque el venv este
-# perfecto. Se lee de la configuracion que genera el propio panel.
-PYVER_SITIO="$(grep -hoE 'python3\.[0-9]+' "$HOME"/admin/config/uwsgi/*.conf 2>/dev/null \
-    | head -1 | sed 's/^python//')"
+# perfecto. Se intenta averiguar por dos caminos antes de elegir a ciegas.
 
-if [ -n "$PYVER_SITIO" ] && printf '%s\n' "$DISPONIBLES" | grep -qx "$PYVER_SITIO"; then
+# 1) la configuracion que genera el propio panel para el sitio
+PYVER_SITIO="$(grep -hoE 'python3\.[0-9]+' "$HOME"/admin/config/uwsgi/*.conf 2>/dev/null \
+    | head -1 | sed 's/^python//' || true)"
+
+# 2) el entorno virtual que ya existe, si tiene Django funcionando: si el sitio
+#    esta en linea ahora mismo, esa es la version buena y no hay que tocarla.
+PYVER_VENV=""
+if [ -x "$VENV/bin/python" ] && "$VENV/bin/python" -c 'import django' 2>/dev/null; then
+    PYVER_VENV="$("$VENV/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])' || true)"
+fi
+
+if [ -n "$PYVER_SITIO" ] && hay_version "$PYVER_SITIO"; then
     PYVER="$PYVER_SITIO"
-    ok "El sitio del panel ya usa Python $PYVER: usare esa misma version"
-elif printf '%s\n' "$DISPONIBLES" | grep -qx "3.13"; then
+    ok "El sitio del panel usa Python $PYVER: usare esa misma version"
+elif [ -n "$PYVER_VENV" ] && hay_version "$PYVER_VENV"; then
+    PYVER="$PYVER_VENV"
+    ok "El entorno actual ya funciona con Python $PYVER: lo conservo"
+    aviso "Comprueba que el sitio del panel tambien diga $PYVER."
+elif hay_version "3.13"; then
     # 3.13 es la version que documenta la guia; se prefiere antes que la mas
     # nueva para no adelantarse a lo que ofrece el panel.
     PYVER="3.13"
-    nota "No pude leer la version del sitio; uso Python $PYVER (la de la guia)"
+    nota "No pude averiguar la version del sitio; uso Python $PYVER (la de la guia)"
+    aviso "En el panel, la Version de Python del sitio tiene que decir $PYVER."
 else
     PYVER="$(printf '%s\n' "$DISPONIBLES" | tail -1)"
-    nota "No pude leer la version del sitio; uso Python $PYVER"
+    nota "No pude averiguar la version del sitio; uso Python $PYVER"
+    aviso "En el panel, la Version de Python del sitio tiene que decir $PYVER."
 fi
 
 PYBIN="$PYBASE/$PYVER/bin/python3"
