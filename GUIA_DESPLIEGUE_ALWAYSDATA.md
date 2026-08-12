@@ -231,7 +231,15 @@ ls /usr/alwaysdata/python/
 ```
 
 Este proyecto usa **Django 6.0, que necesita Python 3.12 o superior**.
-Elige la versión más alta que aparezca (por ejemplo `3.13`) y créate el entorno:
+
+> ⚠️ **Apunta la versión que elijas aquí.** En el Paso 7 tendrás que poner
+> *exactamente la misma* en el campo **Version de Python** del sitio. uWSGI
+> arranca con el intérprete del panel y busca los paquetes en
+> `~/venv-espol/lib/pythonX.Y/`: si el venv es `3.14` y el sitio es `3.13`, no
+> encuentra nada y el log dice `ModuleNotFoundError: No module named 'django'`.
+> **No elijas la más nueva por costumbre**; elige una que el panel ofrezca.
+
+Créate el entorno (esta guía usa `3.13`):
 
 ```bash
 cd ~/www/EspolAcademicsManagev2/backend
@@ -241,8 +249,10 @@ source ~/venv-espol/bin/activate
 
 python --version          # debe decir 3.12.x o superior
 pip install --upgrade pip
-pip install -r requirements-produccion.txt
+pip install --no-cache-dir -r requirements-produccion.txt
 ```
+
+> `--no-cache-dir` evita que `~/.cache/pip` se coma la cuota de 100 MB.
 
 > **Si `mysqlclient` falla al instalarse**, no es problema: instala solo lo demás
 > y usa el driver alternativo en Python puro.
@@ -645,7 +655,7 @@ python manage.py collectstatic --noinput
 | **`Access denied for user`** | Usuario, contraseña o host de MySQL mal escritos en el `.env`. Verifícalos en **Bases de datos → MySQL**. |
 | **`mysqlclient ... is required`** | Instalaste PyMySQL sin activarlo. Agrega `DB_DRIVER=pymysql` al `.env` y reinicia. |
 | **`error: command 'gcc' failed` al instalar mysqlclient** | Usa el driver alternativo: `pip install PyMySQL==1.1.2` y `DB_DRIVER=pymysql` en el `.env`. |
-| **`ModuleNotFoundError: No module named 'django'`** en `~/admin/logs/uwsgi/*.log` | uWSGI arranca con un Python que no ve los paquetes del entorno virtual. Dos causas: (a) la **Version de Python** del sitio no coincide con la del venv — compruébalo con `ls ~/venv-espol/lib/`; (b) `pip` se quedó sin espacio y dejó el venv a medias — verifícalo con `~/venv-espol/bin/python -c "import django"` y reinstala con `~/venv-espol/bin/pip install --no-cache-dir -r ~/www/EspolAcademicsManagev2/backend/requirements.txt`. |
+| **`ModuleNotFoundError: No module named 'django'`** en `~/admin/logs/uwsgi/*.log` | **Causa nº 1:** la *Version de Python* del sitio no es la del entorno virtual. uWSGI arranca con el intérprete del panel y busca los paquetes en `venv-espol/lib/pythonX.Y/`; si el venv se creó con otra versión, no ve nada, aunque esté todo bien instalado. Compara `ls ~/venv-espol/lib/` con la versión que dice el log (`Python version: 3.13.x`) y con la del panel: **las tres deben coincidir**. Si no, [rehaz el venv](#si-el-venv-quedó-con-otra-versión-de-python). **Causa nº 2:** `pip` se quedó sin espacio y dejó el venv a medias; verifícalo con `~/venv-espol/bin/python -c "import django"`. |
 | **`ModuleNotFoundError: No module named 'config'`** | El *Working directory* del sitio no apunta a `.../EspolAcademicsManagev2/backend`. Corrígelo en el Paso 7. |
 | **`SyntaxError` o `Django requires Python 3.12`** | El entorno virtual se creó con una versión vieja de Python. Bórralo (`rm -rf ~/venv-espol`) y repite el Paso 4 con una versión más alta, o baja a `Django==5.2.11`. |
 | **La página queda en blanco tras un cambio** | Falta reiniciar el sitio en el panel. |
@@ -683,6 +693,29 @@ curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/estado/
 ```
 
 Después: crear el sitio (Paso 7) y **reiniciarlo** (Paso 8).
+
+---
+
+### Si el venv quedó con otra versión de Python
+
+Es el fallo más común y se arregla rehaciendo el entorno con la versión exacta
+que usa el sitio (la que aparece en el log como `Python version: 3.13.x`):
+
+```bash
+ls ~/venv-espol/lib/          # ¿python3.13? ¿python3.14?
+
+rm -rf ~/venv-espol
+/usr/alwaysdata/python/3.13/bin/python3 -m venv ~/venv-espol
+~/venv-espol/bin/pip install --no-cache-dir \
+  -r ~/www/EspolAcademicsManagev2/backend/requirements-produccion.txt
+
+# comprobación: esto es exactamente lo que hace uWSGI al arrancar
+cd ~/www/EspolAcademicsManagev2/backend
+~/venv-espol/bin/python -c "from config.wsgi import application; print('ok')"
+```
+
+Si imprime `ok`, reinicia el sitio en el panel y listo. Cambia `3.13` por la
+versión que muestre tu log si es otra.
 
 ---
 

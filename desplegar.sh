@@ -61,12 +61,31 @@ done
 [ -n "$PYBASE" ] || morir "No encuentro los Python de AlwaysData. Revisa: ls /usr/alwaysdata/python/"
 nota "Pythons disponibles en $PYBASE"
 
-# la version mas alta que sea >= 3.12 (lo que exige Django 6)
-PYVER="$(ls "$PYBASE" 2>/dev/null \
+DISPONIBLES="$(ls "$PYBASE" 2>/dev/null \
     | grep -E '^3\.[0-9]+$' \
     | awk -F. '$2 >= 12' \
-    | sort -V | tail -1)"
-[ -n "$PYVER" ] || morir "Este servidor no ofrece Python 3.12+. Django 6.0 lo necesita."
+    | sort -V)"
+[ -n "$DISPONIBLES" ] || morir "Este servidor no ofrece Python 3.12+. Django 6.0 lo necesita."
+
+# La version tiene que ser LA MISMA que la del sitio en el panel: uWSGI arranca
+# con ese interprete y busca los paquetes en venv/lib/pythonX.Y/. Si no coincide,
+# el log dice "ModuleNotFoundError: No module named 'django'" aunque el venv este
+# perfecto. Se lee de la configuracion que genera el propio panel.
+PYVER_SITIO="$(grep -hoE 'python3\.[0-9]+' "$HOME"/admin/config/uwsgi/*.conf 2>/dev/null \
+    | head -1 | sed 's/^python//')"
+
+if [ -n "$PYVER_SITIO" ] && printf '%s\n' "$DISPONIBLES" | grep -qx "$PYVER_SITIO"; then
+    PYVER="$PYVER_SITIO"
+    ok "El sitio del panel ya usa Python $PYVER: usare esa misma version"
+elif printf '%s\n' "$DISPONIBLES" | grep -qx "3.13"; then
+    # 3.13 es la version que documenta la guia; se prefiere antes que la mas
+    # nueva para no adelantarse a lo que ofrece el panel.
+    PYVER="3.13"
+    nota "No pude leer la version del sitio; uso Python $PYVER (la de la guia)"
+else
+    PYVER="$(printf '%s\n' "$DISPONIBLES" | tail -1)"
+    nota "No pude leer la version del sitio; uso Python $PYVER"
+fi
 
 PYBIN="$PYBASE/$PYVER/bin/python3"
 [ -x "$PYBIN" ] || morir "No puedo ejecutar $PYBIN"
@@ -102,12 +121,15 @@ paso "2/8  Preparando el entorno virtual"
 CREAR_VENV=1
 if [ -x "$VENV/bin/python" ]; then
     ACTUAL="$("$VENV/bin/python" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
-    MENOR="${ACTUAL#3.}"
-    if [ "${ACTUAL%%.*}" = "3" ] && [ "$MENOR" -ge 12 ] 2>/dev/null; then
+
+    if [ "$ACTUAL" = "$PYVER" ]; then
         nota "Reutilizo el entorno existente ($VENV, Python $ACTUAL)"
         CREAR_VENV=0
     else
-        aviso "El entorno existente usa Python $ACTUAL, demasiado viejo. Lo rehago."
+        # Un venv de otra version es invisible para uWSGI: sus paquetes viven en
+        # lib/python$ACTUAL/ y el sitio los busca en lib/python$PYVER/.
+        aviso "El entorno existente usa Python $ACTUAL y el sitio arranca con $PYVER."
+        aviso "Son incompatibles: lo rehago con $PYVER."
         rm -rf "$VENV"
     fi
 fi
@@ -296,6 +318,13 @@ ERROR_WSGI="$(mktemp)"
 if "$PY" -c 'from config.wsgi import application' 2>"$ERROR_WSGI"; then
     rm -f "$ERROR_WSGI"
     ok "config/wsgi.py carga correctamente (Python $VER_VENV)"
+    nota "Django cargado desde: $("$PY" -c 'import django, os; print(os.path.dirname(django.__file__))')"
+
+    if [ -n "$PYVER_SITIO" ] && [ "$PYVER_SITIO" != "$VER_VENV" ]; then
+        aviso "OJO: el sitio del panel arranca con Python $PYVER_SITIO y este"
+        aviso "entorno virtual es $VER_VENV. Cambia la Version de Python del"
+        aviso "sitio a $VER_VENV o seguiras viendo 'No module named django'."
+    fi
 else
     printf '\n'
     sed 's/^/   /' "$ERROR_WSGI" >&2
