@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'config',
+    'api',
     'accounts',
     'cursos',
     'evaluaciones',
@@ -69,6 +70,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    'api.middleware.CorsApiMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -174,6 +176,19 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = env_bool('DJANGO_SECURE_SSL_REDIRECT', False)
     SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', '0'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
+
+# ── API PUBLICA (/api/) ───────────────────────────────────────
+# Clave de acceso. Si queda vacia, los recursos publicos quedan
+# abiertos y los que tienen datos personales quedan deshabilitados.
+API_CLAVE = os.environ.get('API_CLAVE', '').strip()
+
+# Dominios autorizados a consultar la API desde un navegador.
+# '*' = cualquiera. Ejemplo: API_ORIGENES=https://misitio.com,https://otro.com
+API_ORIGENES = env_list('API_ORIGENES', '*')
+
+# Paginacion de los listados (?pagina= y ?tam=)
+API_TAM_PAGINA = int(os.environ.get('API_TAM_PAGINA', '25'))
+API_TAM_PAGINA_MAX = int(os.environ.get('API_TAM_PAGINA_MAX', '100'))
 
 # Config academica global
 PORCENTAJE_MINIMO_APROBACION = 60

@@ -8,7 +8,7 @@
 #   bash ~/desplegar.sh
 #
 # Hace: git clone -> entorno virtual -> dependencias -> .env -> migrate ->
-#       datos de prueba -> superusuario.
+#       datos de prueba -> comprobacion de la API -> superusuario.
 #
 # Se puede volver a ejecutar sin miedo: si algo ya existe, lo reutiliza.
 # NO toca la configuracion del sitio en el panel: eso lo haces tu al final,
@@ -80,7 +80,7 @@ if [ "$USADO" != "?" ] && [ "$USADO" -gt 75 ]; then
 fi
 
 # ── 1. codigo ────────────────────────────────────────────────────────────────
-paso "1/7  Descargando el proyecto"
+paso "1/8  Descargando el proyecto"
 
 mkdir -p "$HOME/www"
 if [ -d "$DESTINO/.git" ]; then
@@ -97,7 +97,7 @@ fi
 [ -f "$BACKEND/manage.py" ] || morir "No encuentro $BACKEND/manage.py"
 
 # ── 2. entorno virtual ───────────────────────────────────────────────────────
-paso "2/7  Preparando el entorno virtual"
+paso "2/8  Preparando el entorno virtual"
 
 CREAR_VENV=1
 if [ -x "$VENV/bin/python" ]; then
@@ -121,7 +121,7 @@ PY="$VENV/bin/python"
 PIP="$VENV/bin/pip"
 
 # ── 3. dependencias ──────────────────────────────────────────────────────────
-paso "3/7  Instalando dependencias"
+paso "3/8  Instalando dependencias"
 
 "$PY" -m pip install --quiet --upgrade pip
 nota "Esto puede tardar un par de minutos..."
@@ -138,7 +138,7 @@ else
 fi
 
 # ── 4. archivo .env ──────────────────────────────────────────────────────────
-paso "4/7  Configuracion (.env)"
+paso "4/8  Configuracion (.env)"
 
 if [ -f "$BACKEND/.env" ]; then
     aviso "Ya existe $BACKEND/.env"
@@ -146,6 +146,20 @@ if [ -f "$BACKEND/.env" ]; then
     if [ "${REHACER,,}" != "s" ]; then
         nota "Conservo el .env actual"
         CREAR_ENV=0
+
+        # el .env puede venir de una version anterior, sin la seccion de API
+        if ! grep -q '^API_CLAVE=' "$BACKEND/.env"; then
+            CLAVE_API="$("$PY" -c 'import secrets; print(secrets.token_urlsafe(32))')"
+            {
+                printf '%s\n' ""
+                printf '%s\n' "# API publica (/api/): clave para el encabezado X-API-Key"
+                printf '%s\n' "API_CLAVE=$CLAVE_API"
+                printf '%s\n' "API_ORIGENES=*"
+                printf '%s\n' "API_TAM_PAGINA=25"
+                printf '%s\n' "API_TAM_PAGINA_MAX=100"
+            } >> "$BACKEND/.env"
+            ok "Anadida la configuracion de la API al .env existente"
+        fi
     else
         cp "$BACKEND/.env" "$BACKEND/.env.anterior"
         nota "Copia de seguridad en $BACKEND/.env.anterior"
@@ -160,6 +174,11 @@ if [ "$CREAR_ENV" = "1" ]; then
     SECRETO="$("$PY" -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
     [ -n "$SECRETO" ] || morir "No pude generar la clave secreta de Django."
     ok "Clave secreta generada automaticamente (50 caracteres)"
+
+    # clave de la API publica (/api/)
+    CLAVE_API="$("$PY" -c 'import secrets; print(secrets.token_urlsafe(32))')"
+    [ -n "$CLAVE_API" ] || morir "No pude generar la clave de la API."
+    ok "Clave de la API generada automaticamente"
 
     printf '\n   Contrasena del usuario MySQL "%s"\n' "$DB_USER"
     printf '   %s(la definiste en el panel: Bases de datos → MySQL → Usuarios)%s\n' "$GRIS" "$FIN"
@@ -188,6 +207,12 @@ if [ "$CREAR_ENV" = "1" ]; then
         printf '%s\n' "# Activar cuando el dominio ya responda por HTTPS"
         printf '%s\n' "DJANGO_SECURE_SSL_REDIRECT=False"
         printf '%s\n' "DJANGO_SECURE_HSTS_SECONDS=0"
+        printf '%s\n' ""
+        printf '%s\n' "# API publica (/api/): clave para el encabezado X-API-Key"
+        printf '%s\n' "API_CLAVE=$CLAVE_API"
+        printf '%s\n' "API_ORIGENES=*"
+        printf '%s\n' "API_TAM_PAGINA=25"
+        printf '%s\n' "API_TAM_PAGINA_MAX=100"
     } > "$BACKEND/.env"
 
     chmod 600 "$BACKEND/.env"
@@ -196,7 +221,7 @@ if [ "$CREAR_ENV" = "1" ]; then
 fi
 
 # ── 5. conexion con la base de datos ─────────────────────────────────────────
-paso "5/7  Verificando la conexion con MySQL"
+paso "5/8  Verificando la conexion con MySQL"
 
 cd "$BACKEND"
 if ! "$PY" manage.py check --database default; then
@@ -211,7 +236,7 @@ fi
 ok "Conexion con MySQL correcta"
 
 # ── 6. tablas y datos de prueba ──────────────────────────────────────────────
-paso "6/7  Creando tablas y datos de prueba"
+paso "6/8  Creando tablas y datos de prueba"
 
 "$PY" manage.py migrate
 ok "Migraciones aplicadas"
@@ -230,8 +255,49 @@ else
     nota "Omitido"
 fi
 
-# ── 7. superusuario ──────────────────────────────────────────────────────────
-paso "7/7  Creando tu usuario administrador"
+# ── 7. API publica ───────────────────────────────────────────────────────────
+paso "7/8  Comprobando la API publica (/api/)"
+
+CLAVE_API="$(grep -m1 '^API_CLAVE=' "$BACKEND/.env" | cut -d= -f2- || true)"
+
+if "$PY" - "$DOMINIO" <<'PYEOF'
+import json
+import os
+import sys
+
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from django.conf import settings
+from django.test import Client
+
+cliente = Client()
+cabeceras = {}
+if settings.API_CLAVE:
+    cabeceras['x-api-key'] = settings.API_CLAVE
+
+respuesta = cliente.get('/api/estado/', headers=cabeceras, HTTP_HOST=sys.argv[1])
+
+if respuesta.status_code != 200:
+    print(f'   La API respondio {respuesta.status_code}')
+    sys.exit(1)
+
+datos = json.loads(respuesta.content)['datos']
+totales = datos.get('totales') or {}
+print('   base de datos: {}  ·  cursos: {}  ·  modulos: {}'.format(
+    datos['base_de_datos'], totales.get('cursos', 0), totales.get('modulos', 0),
+))
+PYEOF
+then
+    ok "La API responde correctamente"
+else
+    aviso "La API no respondio como se esperaba. Revisa backend/.env (API_CLAVE)."
+fi
+
+# ── 8. superusuario ──────────────────────────────────────────────────────────
+paso "8/8  Creando tu usuario administrador"
 
 printf '\n'
 nota "Te pedira: correo, nombres, apellidos, identificacion, celular y contrasena."
@@ -261,6 +327,16 @@ Guarda, pulsa Reiniciar, y abre:
 
   https://$DOMINIO/
   https://$DOMINIO/admin/
+  https://$DOMINIO/api/          <-- indice de la API (JSON)
+
+API publica de consulta externa
+  Clave (X-API-Key) ........ $CLAVE_API
+  Guardala: esta tambien en $BACKEND/.env
+
+  Prueba rapida desde cualquier computadora:
+
+    curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/estado/
+    curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/cursos/
 
 Si sale "Connection to upstream failed", el detalle esta en:
 

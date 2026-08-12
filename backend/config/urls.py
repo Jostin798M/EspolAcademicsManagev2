@@ -17,6 +17,9 @@ urlpatterns = [
     path('evaluaciones/', include('evaluaciones.urls')),
     path('reportes/', include('reportes.urls')),
 
+    # API publica de consulta externa (JSON)
+    path('api/', include('api.urls')),
+
     # Raiz -> index.html (login del frontend)
     re_path(r'^$', serve, {'document_root': FRONTEND, 'path': 'index.html'}),
 

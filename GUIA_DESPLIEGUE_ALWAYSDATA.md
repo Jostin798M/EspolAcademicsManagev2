@@ -12,6 +12,7 @@ Al terminar tendrás funcionando en `https://jostin.alwaysdata.net`:
 | `/accounts/usuarios/` | CRUD de usuarios |
 | `/cursos/…` | CRUD de facultades, cursos, fórmula, inscripciones, módulos, materiales, progreso |
 | `/evaluaciones/…` | CRUD de tareas, entregas, quizzes, preguntas, respuestas |
+| `/api/` | **API pública de consulta externa (JSON)** — ver *Paso 8 bis* |
 | `/admin/` | Panel de administración de Django |
 
 > **Esta guía ya está personalizada** para la cuenta `jostin`
@@ -118,9 +119,11 @@ bash ~/desplegar.sh
 ```
 
 El script hace, en este orden: `git clone` en `~/www` → entorno virtual →
-dependencias → genera la clave secreta de Django y te **pide la contraseña de
-MySQL** para escribir el `.env` → `migrate` → datos de prueba → te pide crear el
-**superusuario**. Al terminar imprime los valores exactos para el Paso 7.
+dependencias → genera la clave secreta de Django **y la clave de la API** y te
+**pide la contraseña de MySQL** para escribir el `.env` → `migrate` → datos de
+prueba → comprueba que la API responde → te pide crear el **superusuario**. Al
+terminar imprime los valores exactos para el Paso 7 **y la clave de la API** que
+necesitarás para consultarla desde fuera (*Paso 8 bis*).
 
 Se puede volver a ejecutar cuantas veces quieras: si algo ya existe, lo
 reutiliza en vez de duplicarlo. **No** configura el sitio en el panel: los Pasos
@@ -283,7 +286,23 @@ DB_PORT=3306
 
 # Activar cuando el dominio ya responda por HTTPS
 DJANGO_SECURE_SSL_REDIRECT=False
+
+# API pública (/api/): clave que enviarán los clientes en X-API-Key
+API_CLAVE=<una clave larga y aleatoria, distinta de la de Django>
+API_ORIGENES=*
+API_TAM_PAGINA=25
+API_TAM_PAGINA_MAX=100
 ```
+
+> Para generar `API_CLAVE` sin inventarla a mano:
+>
+> ```bash
+> python -c "import secrets; print(secrets.token_urlsafe(32))"
+> ```
+>
+> Si dejas `API_CLAVE` vacía, los recursos públicos de la API quedan **abiertos
+> a cualquiera** y los que exponen datos personales (`/api/usuarios/`,
+> `/api/cursos/<código>/estudiantes/`) quedan **deshabilitados**.
 
 > La clave secreta y la contraseña de MySQL **no se escriben en esta guía** ni en
 > `.env.ejemplo`: ambos archivos van al repositorio. Viven solo en el `.env` del
@@ -294,7 +313,7 @@ Guarda con `Ctrl+O`, `Enter`, y sal con `Ctrl+X`.
 **Comprueba que no quedó ningún marcador sin reemplazar:**
 
 ```bash
-grep -nE 'jostin|<la |pega-aqui' .env
+grep -nE 'jostin|<la |<una |pega-aqui' .env
 ```
 
 Si imprime algo, esa línea sigue con el texto de la plantilla. Un marcador
@@ -393,6 +412,7 @@ Abre en el navegador y verifica una por una:
 | `https://jostin.alwaysdata.net/accounts/usuarios/` | Listado de usuarios con botones Detalle / Editar / Eliminar |
 | `https://jostin.alwaysdata.net/cursos/cursos/` | Listado de cursos |
 | `https://jostin.alwaysdata.net/evaluaciones/tareas/` | Listado de tareas |
+| `https://jostin.alwaysdata.net/api/` | Índice de la API en JSON (ver *Paso 8 bis*) |
 
 > `/panel/` y todo el CRUD piden inicio de sesión. Si te redirige al login,
 > entra con tu superusuario y vuelve a la dirección.
@@ -410,6 +430,160 @@ Prueba también el ciclo completo en cualquier módulo:
 **Registrar → Guardar → Detalle → Editar → Eliminar**, y confirma que al
 intentar eliminar una facultad que tiene cursos aparece el mensaje rojo
 *"No se puede eliminar la facultad porque tiene cursos relacionados"*.
+
+---
+
+## Paso 8 bis. La API pública (`/api/`)
+
+El módulo `backend/api/` publica los datos del sistema en **JSON** para que
+otras aplicaciones (una app móvil, otra página web, Postman, un script de
+Python) puedan consultarlos desde fuera del servidor.
+
+Características:
+
+- **Solo lectura.** Únicamente acepta `GET`; cualquier otro método responde `405`.
+  Nada de lo que hay en la API puede modificar la base de datos.
+- **Sin dependencias nuevas.** Está hecha con Django puro (`JsonResponse`), no
+  con Django REST Framework, para no consumir la cuota de 100 MB de la cuenta.
+- **CORS habilitado**, así que se puede llamar desde el navegador de otro sitio.
+- **Autenticación por clave** con el encabezado `X-API-Key`.
+
+### Cómo se autentica
+
+| Situación | Recursos públicos (facultades, cursos, módulos, tareas, quizzes, reportes) | Recursos con datos personales (`usuarios`, `estudiantes`) |
+|---|---|---|
+| `API_CLAVE` **con valor** en `.env` | Piden la clave | Piden la clave |
+| `API_CLAVE` **vacía** | Abiertos a cualquiera | Deshabilitados (responden `503`) |
+
+La clave se envía de dos formas:
+
+```bash
+# recomendada: en el encabezado
+curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/cursos/
+
+# alternativa (útil para probar desde la barra del navegador)
+curl "https://jostin.alwaysdata.net/api/cursos/?clave=TU_CLAVE"
+```
+
+### Recursos disponibles
+
+| Método y ruta | Qué devuelve |
+|---|---|
+| `GET /api/` | Índice: lista todos los recursos, filtros y opciones de paginación |
+| `GET /api/estado/` | Salud del servicio: versión, conexión a la base y totales |
+| `GET /api/facultades/` | Listado de facultades con su número de cursos |
+| `GET /api/facultades/<código>/` | Una facultad y sus cursos (ej. `FIEC`) |
+| `GET /api/cursos/` | Catálogo de cursos (paginado) |
+| `GET /api/cursos/<código>/` | Curso completo: fórmula, módulos, materiales, tareas y quizzes |
+| `GET /api/cursos/<código>/modulos/` | Módulos del curso con sus materiales |
+| `GET /api/cursos/<código>/tareas/` | Tareas del curso |
+| `GET /api/cursos/<código>/quizzes/` | Quizzes del curso |
+| `GET /api/quizzes/<id>/` | Quiz con sus preguntas (**sin** las respuestas correctas) |
+| `GET /api/reportes/resumen/` | Indicadores del tablero: totales, promedios y estado de entregas |
+| `GET /api/usuarios/` | 🔒 Usuarios registrados (datos personales) |
+| `GET /api/cursos/<código>/estudiantes/` | 🔒 Estudiantes inscritos en un curso |
+
+Los cursos y las facultades se buscan por su **código** (`DAWM-2026A`, `FIEC`),
+no por su `id`, y no distingue mayúsculas de minúsculas.
+
+### Filtros y paginación
+
+| Recurso | Parámetros |
+|---|---|
+| `/api/cursos/` | `facultad`, `estado` (`activo`/`archivado`), `profesor` (id o correo), `buscar` |
+| `/api/usuarios/` | `rol`, `estado`, `facultad`, `buscar` |
+| `/api/reportes/resumen/` | `facultad`, `estado` |
+| Todos los listados | `pagina` (por defecto 1), `tam` (por defecto 25, máximo 100) |
+
+```bash
+# cursos activos de la FIEC, de 10 en 10, segunda página
+curl -H "X-API-Key: TU_CLAVE" \
+  "https://jostin.alwaysdata.net/api/cursos/?facultad=FIEC&estado=activo&tam=10&pagina=2"
+```
+
+### Forma de las respuestas
+
+Todo viene envuelto igual, de modo que el cliente siempre revisa `ok` primero:
+
+```json
+{
+  "ok": true,
+  "datos": [
+    {
+      "id_curso": 4,
+      "codigo": "DAWM-2026A",
+      "nombre": "Desarrollo de Aplicaciones Web y Moviles",
+      "estado": "activo",
+      "fecha_inicio": "2026-03-01",
+      "fecha_fin": "2026-07-31",
+      "facultad": { "id_facultad": 5, "codigo": "FIEC", "nombre": "..." },
+      "profesor": { "id_usuario": 8, "nombre_completo": "Roberto Llerena Castillo" }
+    }
+  ],
+  "paginacion": {
+    "pagina": 1, "paginas": 3, "tam": 1, "total": 3,
+    "siguiente": 2, "anterior": null
+  }
+}
+```
+
+Y los errores, también en JSON (nunca una página HTML de Django):
+
+```json
+{ "ok": false, "error": "Clave de API invalida o ausente. Envia el encabezado X-API-Key.", "codigo": 401 }
+```
+
+| Código | Significado |
+|---|---|
+| `200` | Todo bien |
+| `400` | Un parámetro mal escrito (por ejemplo `estado=inventado`) |
+| `401` | Falta la clave o es incorrecta |
+| `404` | El curso, la facultad o la ruta no existen |
+| `405` | Se usó `POST`, `PUT` o `DELETE`: la API es de solo lectura |
+| `503` | Se pidió un recurso privado sin `API_CLAVE` configurada |
+
+### Ejemplo de consumo desde otra aplicación
+
+```javascript
+const RESPUESTA = await fetch(
+  "https://jostin.alwaysdata.net/api/cursos/?estado=activo",
+  { headers: { "X-API-Key": "TU_CLAVE" } },
+);
+
+const { ok, datos } = await RESPUESTA.json();
+if (ok) datos.forEach(curso => console.log(curso.codigo, curso.nombre));
+```
+
+```python
+import requests
+
+r = requests.get(
+    "https://jostin.alwaysdata.net/api/cursos/",
+    headers={"X-API-Key": "TU_CLAVE"},
+    params={"facultad": "FIEC"},
+    timeout=10,
+)
+for curso in r.json()["datos"]:
+    print(curso["codigo"], curso["nombre"])
+```
+
+### Limitar quién puede llamarla desde el navegador
+
+Por defecto `API_ORIGENES=*` acepta peticiones de cualquier página. Para
+restringirla, escribe los dominios separados por coma en el `.env` y reinicia:
+
+```
+API_ORIGENES=https://mi-otra-app.com,https://jostin.alwaysdata.net
+```
+
+### Probarla antes de subirla
+
+En tu computadora, con el entorno virtual activado y dentro de `backend/`:
+
+```bash
+python manage.py test api        # 18 pruebas del módulo
+python manage.py runserver       # luego abre http://127.0.0.1:8000/api/
+```
 
 ---
 
@@ -474,6 +648,10 @@ python manage.py collectstatic --noinput
 | **`ModuleNotFoundError: No module named 'config'`** | El *Working directory* del sitio no apunta a `.../EspolAcademicsManagev2/backend`. Corrígelo en el Paso 7. |
 | **`SyntaxError` o `Django requires Python 3.12`** | El entorno virtual se creó con una versión vieja de Python. Bórralo (`rm -rf ~/venv-espol`) y repite el Paso 4 con una versión más alta, o baja a `Django==5.2.11`. |
 | **La página queda en blanco tras un cambio** | Falta reiniciar el sitio en el panel. |
+| **`/api/` responde `401`** | Falta el encabezado `X-API-Key` o la clave no coincide con `API_CLAVE` del `.env`. Compruébala con `grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env`. |
+| **`/api/usuarios/` responde `503`** | `API_CLAVE` está vacía en el `.env`. Ponle un valor y reinicia el sitio. |
+| **`/api/` devuelve HTML en vez de JSON** | La ruta `path('api/', include('api.urls'))` quedó **después** del `re_path` que sirve el frontend en `config/urls.py`, o falta `'api'` en `INSTALLED_APPS`. |
+| **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. |
 
 ---
 
@@ -498,6 +676,9 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 python manage.py seed           # datos de prueba (opcional)
 python manage.py createsuperuser
+
+# Comprobar la API una vez que el sitio esté en línea
+curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/estado/
 ```
 
 Después: crear el sitio (Paso 7) y **reiniciarlo** (Paso 8).
