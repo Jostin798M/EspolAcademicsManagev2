@@ -10,6 +10,8 @@ from django.conf import settings
 from django.core.paginator import EmptyPage, Paginator
 from django.http import Http404, JsonResponse
 
+from . import seguridad
+
 
 class ErrorApi(Exception):
     """Error controlado que se devuelve al cliente en formato JSON."""
@@ -36,45 +38,9 @@ def error(mensaje, codigo=400):
     )
 
 
-def clave_recibida(request):
-    """Lee la clave del encabezado X-API-Key o del parametro ?clave=."""
-    return (
-        request.headers.get('X-API-Key')
-        or request.GET.get('clave')
-        or ''
-    ).strip()
-
-
-def _validar_clave(request, privado):
-    """
-    Reglas de acceso:
-
-    * endpoints publicos  -> solo piden clave si API_CLAVE esta configurada;
-    * endpoints privados  -> piden clave siempre (datos personales).
-    """
-    configurada = getattr(settings, 'API_CLAVE', '')
-
-    if not configurada:
-        if privado:
-            raise ErrorApi(
-                'Este recurso expone datos personales y requiere una clave. '
-                'Define API_CLAVE en backend/.env para habilitarlo.',
-                503,
-            )
-        return
-
-    if clave_recibida(request) != configurada:
-        raise ErrorApi(
-            'Clave de API invalida o ausente. Envia el encabezado X-API-Key.',
-            401,
-        )
-
-
 def esta_autenticado(request):
-    """True si no hace falta clave o si la recibida es correcta."""
-    configurada = getattr(settings, 'API_CLAVE', '')
-
-    return not configurada or clave_recibida(request) == configurada
+    """True si quien consulta se identifico (sesion de superadmin o clave)."""
+    return seguridad.por_sesion(request) or seguridad.por_clave(request)
 
 
 def endpoint(privado=False, abierto=False):
@@ -96,7 +62,10 @@ def endpoint(privado=False, abierto=False):
 
             try:
                 if not abierto:
-                    _validar_clave(request, privado)
+                    acceso = seguridad.autorizar(request, privado)
+
+                    if not acceso:
+                        return error(acceso.mensaje, acceso.codigo)
 
                 return vista(request, *args, **kwargs)
             except ErrorApi as exc:

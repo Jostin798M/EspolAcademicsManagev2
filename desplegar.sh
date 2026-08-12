@@ -206,7 +206,10 @@ if [ -f "$BACKEND/.env" ]; then
             CLAVE_API="$("$PY" -c 'import secrets; print(secrets.token_urlsafe(32))')"
             {
                 printf '%s\n' ""
-                printf '%s\n' "# API publica (/api/): clave para el encabezado X-API-Key"
+                printf '%s\n' "# API de consulta (/api/). Se entra con la sesion de un usuario"
+                printf '%s\n' "# SUPERADMIN o con esta clave (para programas externos)."
+                printf '%s\n' "API_MODO=privada"
+                printf '%s\n' "API_ROLES=SUPERADMIN"
                 printf '%s\n' "API_CLAVE=$CLAVE_API"
                 printf '%s\n' "API_ORIGENES=*"
                 printf '%s\n' "API_TAM_PAGINA=25"
@@ -262,7 +265,10 @@ if [ "$CREAR_ENV" = "1" ]; then
         printf '%s\n' "DJANGO_SECURE_SSL_REDIRECT=False"
         printf '%s\n' "DJANGO_SECURE_HSTS_SECONDS=0"
         printf '%s\n' ""
-        printf '%s\n' "# API publica (/api/): clave para el encabezado X-API-Key"
+        printf '%s\n' "# API de consulta (/api/). Se entra con la sesion de un usuario"
+        printf '%s\n' "# SUPERADMIN o con esta clave (para programas externos)."
+        printf '%s\n' "API_MODO=privada"
+        printf '%s\n' "API_ROLES=SUPERADMIN"
         printf '%s\n' "API_CLAVE=$CLAVE_API"
         printf '%s\n' "API_ORIGENES=*"
         printf '%s\n' "API_TAM_PAGINA=25"
@@ -408,14 +414,19 @@ Guarda, pulsa Reiniciar, y abre:
   https://$DOMINIO/admin/
   https://$DOMINIO/api/          <-- indice de la API (JSON)
 
-API publica de consulta externa
-  Clave (X-API-Key) ........ $CLAVE_API
-  Guardala: esta tambien en $BACKEND/.env
+API de consulta (/api/)
 
-  Prueba rapida desde cualquier computadora:
+  Desde el navegador, sin claves: inicia sesion en https://$DOMINIO/admin/
+  con tu usuario SUPERADMIN y abre https://$DOMINIO/api/cursos/
+
+  Desde un programa externo (no tiene sesion), con la clave:
 
     curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/estado/
     curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/cursos/
+
+  Clave (X-API-Key) ........ $CLAVE_API
+  Guardala: esta tambien en $BACKEND/.env. Si solo la vas a consultar
+  desde el navegador, puedes dejar API_CLAVE vacia y borrarla.
 
 Si sale "Connection to upstream failed", el detalle esta en:
 

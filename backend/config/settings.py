@@ -178,8 +178,24 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 
 # ── API PUBLICA (/api/) ───────────────────────────────────────
-# Clave de acceso. Si queda vacia, los recursos publicos quedan
-# abiertos y los que tienen datos personales quedan deshabilitados.
+# Se entra de dos formas y basta con una (ver api/seguridad.py):
+#   1. sesion iniciada en el sitio con un usuario SUPERADMIN;
+#   2. clave en el encabezado X-API-Key.
+#
+# API_MODO controla el catalogo academico (facultades, cursos, modulos,
+# tareas, quizzes, reportes):
+#   privada -> exige sesion de superadmin o clave (por defecto)
+#   publica -> cualquiera puede consultarlo sin identificarse
+# Los datos personales (usuarios, estudiantes) exigen siempre una de las
+# dos vias, aunque el modo sea publico.
+API_MODO = os.environ.get('API_MODO', 'privada').strip().lower()
+
+# Roles que pueden usar la API con su sesion. Un superusuario de Django
+# entra siempre, tenga el rol que tenga.
+API_ROLES = env_list('API_ROLES', 'SUPERADMIN')
+
+# Clave para programas externos (curl, otra aplicacion). Es opcional:
+# si queda vacia, solo se entra con sesion de super administrador.
 API_CLAVE = os.environ.get('API_CLAVE', '').strip()
 
 # Dominios autorizados a consultar la API desde un navegador.

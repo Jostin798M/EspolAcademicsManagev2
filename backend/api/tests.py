@@ -58,9 +58,9 @@ class ApiBaseTest(TestCase):
         return json.loads(respuesta.content)
 
 
-@override_settings(API_CLAVE='')
+@override_settings(API_CLAVE='', API_MODO='publica')
 class ApiPublicaTest(ApiBaseTest):
-    """Sin clave configurada: los recursos publicos quedan abiertos."""
+    """Modo publico y sin clave: el catalogo queda abierto a cualquiera."""
 
     def test_indice_lista_los_recursos(self):
         respuesta = self.client.get(reverse('api:indice'))
@@ -123,10 +123,10 @@ class ApiPublicaTest(ApiBaseTest):
 
         self.assertEqual(respuesta['Access-Control-Allow-Origin'], '*')
 
-    def test_recurso_privado_sin_clave_configurada_devuelve_503(self):
+    def test_recurso_privado_sin_identificarse_devuelve_401(self):
         respuesta = self.client.get(reverse('api:usuarios'))
 
-        self.assertEqual(respuesta.status_code, 503)
+        self.assertEqual(respuesta.status_code, 401)
 
     def test_reporte_resumen_entrega_indicadores(self):
         cuerpo = self.cuerpo(self.client.get(reverse('api:reporte_resumen')))
@@ -147,7 +147,9 @@ class ApiConClaveTest(ApiBaseTest):
         respuesta = self.client.get(reverse('api:indice'))
 
         self.assertEqual(respuesta.status_code, 200)
-        self.assertFalse(self.cuerpo(respuesta)['datos']['autenticacion']['autenticado'])
+        seguridad = self.cuerpo(respuesta)['datos']['seguridad']
+        self.assertFalse(seguridad['acceso_actual']['autorizado'])
+        self.assertTrue(seguridad['vias']['clave']['configurada'])
 
     def test_el_estado_no_pide_clave_pero_oculta_los_totales(self):
         cuerpo = self.cuerpo(self.client.get(reverse('api:estado')))
@@ -198,3 +200,97 @@ class ApiConClaveTest(ApiBaseTest):
         )
 
         self.assertEqual(cuerpo['datos'][0]['usuario']['correo'], 'alumno@espol.edu.ec')
+
+
+@override_settings(API_CLAVE='')
+class ApiSesionTest(ApiBaseTest):
+    """Acceso con la sesion del sitio, sin ninguna clave configurada."""
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        cls.superadmin = Usuario.objects.create_user(
+            correo='jefe@espol.edu.ec',
+            password='clave-de-prueba',
+            nombres='Sofia',
+            apellidos='Mora',
+            identificacion='0900000003',
+            celular='0990000003',
+            rol=Usuario.Rol.SUPERADMIN,
+        )
+
+    def test_superadmin_entra_a_los_recursos_privados(self):
+        self.client.force_login(self.superadmin)
+
+        respuesta = self.client.get(reverse('api:usuarios'))
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(self.cuerpo(respuesta)['paginacion']['total'], 3)
+
+    def test_usuario_normal_no_entra(self):
+        self.client.force_login(self.estudiante)
+
+        respuesta = self.client.get(reverse('api:usuarios'))
+
+        self.assertEqual(respuesta.status_code, 401)
+
+    def test_superadmin_inactivo_no_entra(self):
+        self.superadmin.is_active = False
+        self.superadmin.save(update_fields=['is_active'])
+        self.client.force_login(self.superadmin)
+
+        respuesta = self.client.get(reverse('api:usuarios'))
+
+        self.assertEqual(respuesta.status_code, 401)
+
+    def test_el_indice_informa_de_la_via_usada(self):
+        self.client.force_login(self.superadmin)
+
+        datos = self.cuerpo(self.client.get(reverse('api:indice')))['datos']
+
+        self.assertEqual(datos['seguridad']['acceso_actual']['via'], 'sesion')
+        self.assertEqual(
+            datos['seguridad']['acceso_actual']['usuario'], 'jefe@espol.edu.ec',
+        )
+
+    def test_sin_sesion_el_catalogo_exige_identificarse(self):
+        respuesta = self.client.get(reverse('api:cursos'))
+
+        self.assertEqual(respuesta.status_code, 401)
+
+    @override_settings(API_MODO='publica')
+    def test_en_modo_publico_el_catalogo_queda_abierto(self):
+        respuesta = self.client.get(reverse('api:cursos'))
+
+        self.assertEqual(respuesta.status_code, 200)
+
+
+@override_settings(API_CLAVE='', API_MODO='privada')
+class ApiModoPrivadaTest(ApiBaseTest):
+    """Con API_MODO=privada no se consulta nada sin identificarse."""
+
+    def test_el_catalogo_exige_identificarse(self):
+        respuesta = self.client.get(reverse('api:cursos'))
+
+        self.assertEqual(respuesta.status_code, 401)
+
+    def test_el_indice_sigue_abierto(self):
+        respuesta = self.client.get(reverse('api:indice'))
+
+        self.assertEqual(respuesta.status_code, 200)
+
+    def test_el_superusuario_de_django_entra(self):
+        jefe = Usuario.objects.create_superuser(
+            correo='root@espol.edu.ec',
+            password='clave-de-prueba',
+            nombres='Root',
+            apellidos='Django',
+            identificacion='0900000004',
+            celular='0990000004',
+        )
+        self.client.force_login(jefe)
+
+        respuesta = self.client.get(reverse('api:cursos'))
+
+        self.assertEqual(respuesta.status_code, 200)

@@ -34,10 +34,15 @@ class CorsApiMiddleware:
         origen = request.headers.get('Origin', '')
 
         if '*' in origenes:
+            # Con '*' el navegador NO envia cookies, asi que una pagina de otro
+            # dominio nunca puede leer datos usando la sesion de quien la visita.
             respuesta['Access-Control-Allow-Origin'] = '*'
         elif origen in origenes:
             respuesta['Access-Control-Allow-Origin'] = origen
             respuesta['Vary'] = 'Origin'
+            # Solo con dominios concretos se permiten cookies: asi la sesion de
+            # super administrador sirve tambien desde otra aplicacion tuya.
+            respuesta['Access-Control-Allow-Credentials'] = 'true'
         else:
             return
 

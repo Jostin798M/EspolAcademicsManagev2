@@ -297,12 +297,18 @@ DB_PORT=3306
 # Activar cuando el dominio ya responda por HTTPS
 DJANGO_SECURE_SSL_REDIRECT=False
 
-# API pública (/api/): clave que enviarán los clientes en X-API-Key
+# API de consulta (/api/) — ver Paso 8 bis
+API_MODO=privada
+API_ROLES=SUPERADMIN
 API_CLAVE=<una clave larga y aleatoria, distinta de la de Django>
 API_ORIGENES=*
 API_TAM_PAGINA=25
 API_TAM_PAGINA_MAX=100
 ```
+
+> `API_CLAVE` es **opcional**: sirve para que programas externos consulten la
+> API. Si solo la vas a mirar tú desde el navegador, déjala vacía y entra con tu
+> sesión de super administrador.
 
 > Para generar `API_CLAVE` sin inventarla a mano:
 >
@@ -456,36 +462,67 @@ Características:
 - **Sin dependencias nuevas.** Está hecha con Django puro (`JsonResponse`), no
   con Django REST Framework, para no consumir la cuota de 100 MB de la cuenta.
 - **CORS habilitado**, así que se puede llamar desde el navegador de otro sitio.
-- **Autenticación por clave** con el encabezado `X-API-Key`.
+- **Dos formas de entrar**, y basta con una: tu **sesión de super administrador**
+  (nada que escribir) o una **clave** para programas externos.
 
 ### Cómo se autentica
 
-| Situación | `/api/` y `/api/estado/` | Recursos de datos (facultades, cursos, módulos, tareas, quizzes, reportes) | Datos personales (`usuarios`, `estudiantes`) |
+El módulo `backend/api/seguridad.py` decide quién entra. Hay dos vías y basta
+con cumplir una:
+
+| Vía | Para qué sirve | Cómo |
+|---|---|---|
+| **Sesión** | Mirar la API tú, desde el navegador | Inicia sesión en `/admin/` con un usuario de rol **SUPERADMIN** y abre la API en la misma ventana. No hay claves de por medio. |
+| **Clave** | Programas externos (curl, otra app, un script) que no tienen sesión ni cookies | Encabezado `X-API-Key: <clave>` (o `?clave=<clave>`) |
+
+Un superusuario de Django entra siempre, tenga el rol que tenga. Puedes ampliar
+los roles con `API_ROLES=SUPERADMIN,ADMIN` en el `.env`.
+
+**Si solo la vas a consultar desde el navegador, puedes dejar `API_CLAVE` vacía
+y borrarla del `.env`.** La sesión basta.
+
+`API_MODO` decide qué pasa con quien **no** se identifica de ninguna de las dos
+formas:
+
+| | `/api/` y `/api/estado/` | Catálogo (facultades, cursos, módulos, tareas, quizzes, reportes) | Datos personales (`usuarios`, `estudiantes`) |
 |---|---|---|---|
-| `API_CLAVE` **con valor** en `.env` | Abiertos | Piden la clave | Piden la clave |
-| `API_CLAVE` **vacía** | Abiertos | Abiertos a cualquiera | Deshabilitados (responden `503`) |
+| `API_MODO=privada` *(por defecto)* | Abiertos | Sesión o clave | Sesión o clave |
+| `API_MODO=publica` | Abiertos | Abiertos a cualquiera | Sesión o clave |
 
-`/api/` y `/api/estado/` nunca piden clave: el índice no devuelve datos del
-sistema y el estado sirve para monitorear el servicio (sus totales sí se
-ocultan si no envías la clave). Así, al abrir `https://jostin.alwaysdata.net/api/`
-en el navegador ves la lista de recursos y cómo autenticarte, en vez de un `401`.
+`/api/` y `/api/estado/` nunca piden nada: el índice no devuelve datos del
+sistema y el estado sirve para monitorear el servicio (sus totales sí se ocultan
+a quien no se identifica). Al abrir `https://jostin.alwaysdata.net/api/` en el
+navegador ves la lista de recursos y **si tu sesión actual está autorizada**:
 
-La clave se envía de dos formas:
-
-```bash
-# recomendada: en el encabezado
-curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/cursos/
-
-# alternativa (útil para probar desde la barra del navegador)
-curl "https://jostin.alwaysdata.net/api/cursos/?clave=TU_CLAVE"
+```json
+"acceso_actual": { "autorizado": true, "via": "sesion", "usuario": "tu@espol.edu.ec" }
 ```
 
-Un navegador no puede enviar encabezados al escribir una dirección, así que
-**para mirarla desde el navegador usa `?clave=`**:
+#### Desde el navegador (lo más cómodo)
+
+1. Entra a `https://jostin.alwaysdata.net/admin/` con tu superusuario.
+2. En esa misma ventana abre `https://jostin.alwaysdata.net/api/cursos/`.
+
+Ya está: la cookie de sesión viaja sola. Si cierras sesión, vuelve el `401`.
+
+#### Desde un programa
+
+Un script no tiene sesión, así que usa la clave:
+
+```bash
+curl -H "X-API-Key: TU_CLAVE" https://jostin.alwaysdata.net/api/cursos/
+```
+
+Un navegador no puede enviar encabezados al escribir una dirección; si no
+quieres iniciar sesión, añade `?clave=` a la URL:
 
 ```
 https://jostin.alwaysdata.net/api/cursos/?clave=TU_CLAVE
 ```
+
+> Ten en cuenta que así la clave queda en el historial y en los registros del
+> servidor. Con la sesión no pasa eso, por eso es la vía recomendada para mirarla
+> tú mismo.
 
 Si no recuerdas la clave, está en el servidor:
 
@@ -565,17 +602,18 @@ Y los errores, también en JSON (nunca una página HTML de Django):
 |---|---|
 | `200` | Todo bien |
 | `400` | Un parámetro mal escrito (por ejemplo `estado=inventado`) |
-| `401` | Falta la clave o es incorrecta |
+| `401` | No te identificaste: ni sesión de SUPERADMIN ni clave válida |
 | `404` | El curso, la facultad o la ruta no existen |
 | `405` | Se usó `POST`, `PUT` o `DELETE`: la API es de solo lectura |
-| `503` | Se pidió un recurso privado sin `API_CLAVE` configurada |
 
 ### Ejemplo de consumo desde otra aplicación
 
 ```javascript
+// Desde una página del mismo dominio, con la sesión ya iniciada,
+// basta con credentials: "include" y ninguna clave.
 const RESPUESTA = await fetch(
   "https://jostin.alwaysdata.net/api/cursos/?estado=activo",
-  { headers: { "X-API-Key": "TU_CLAVE" } },
+  { headers: { "X-API-Key": "TU_CLAVE" }, credentials: "include" },
 );
 
 const { ok, datos } = await RESPUESTA.json();
@@ -677,11 +715,11 @@ python manage.py collectstatic --noinput
 | **`ModuleNotFoundError: No module named 'config'`** | El *Working directory* del sitio no apunta a `.../EspolAcademicsManagev2/backend`. Corrígelo en el Paso 7. |
 | **`SyntaxError` o `Django requires Python 3.12`** | El entorno virtual se creó con una versión vieja de Python. Bórralo (`rm -rf ~/venv-espol`) y repite el Paso 4 con una versión más alta, o baja a `Django==5.2.11`. |
 | **La página queda en blanco tras un cambio** | Falta reiniciar el sitio en el panel. |
-| **`401` al abrir la API en el navegador** | Es lo esperado en los recursos de datos: el navegador no envía encabezados. Añade `?clave=TU_CLAVE` a la dirección, o usa `curl -H "X-API-Key: ..."`. El índice `/api/` sí abre sin clave. |
+| **`401` al abrir la API en el navegador** | No has iniciado sesión, o el usuario con el que entraste no es `SUPERADMIN`. Entra en `/admin/` y vuelve a la dirección; comprueba tu rol en `/api/` (`acceso_actual`). También sirve añadir `?clave=TU_CLAVE`. |
 | **`401` con la clave puesta** | No coincide con `API_CLAVE` del `.env`, o el `.env` cambió y falta reiniciar el sitio. Compruébala con `grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env`. |
 | **`/api/usuarios/` responde `503`** | `API_CLAVE` está vacía en el `.env`. Ponle un valor y reinicia el sitio. |
 | **`/api/` devuelve HTML en vez de JSON** | La ruta `path('api/', include('api.urls'))` quedó **después** del `re_path` que sirve el frontend en `config/urls.py`, o falta `'api'` en `INSTALLED_APPS`. |
-| **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. |
+| **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. Ojo: para usar la **sesión** desde otro dominio hay que listarlo explícitamente — con `*` el navegador no envía cookies, y ahí solo funciona la clave. |
 
 ---
 
