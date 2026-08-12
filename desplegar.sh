@@ -123,19 +123,51 @@ PIP="$VENV/bin/pip"
 # ── 3. dependencias ──────────────────────────────────────────────────────────
 paso "3/8  Instalando dependencias"
 
-"$PY" -m pip install --quiet --upgrade pip
-nota "Esto puede tardar un par de minutos..."
+# --no-cache-dir es importante: ~/.cache/pip llena la cuota de 100 MB, y un pip
+# que se queda sin espacio a mitad de camino deja el venv sin Django.
+PIP_OPCIONES=(--quiet --no-cache-dir)
+
+hay_driver_mysql() {
+    "$PY" -c 'import MySQLdb' 2>/dev/null || "$PY" -c 'import pymysql' 2>/dev/null
+}
+
+if [ -d "$HOME/.cache/pip" ]; then
+    rm -rf "$HOME/.cache/pip"
+    nota "Borrada la cache de pip para no gastar cuota"
+fi
 
 USAR_PYMYSQL=0
-if "$PIP" install --quiet -r "$BACKEND/requirements-produccion.txt"; then
-    ok "Dependencias instaladas (driver mysqlclient)"
+
+if "$PY" -c 'import django, whitenoise' 2>/dev/null && hay_driver_mysql; then
+    # Ya estaba todo instalado: no se reinstala. Reinstalar gasta cuota y, si
+    # el disco se llena, rompe el venv que ahora mismo funciona.
+    nota "Las dependencias ya estan instaladas, no las toco"
+    "$PY" -c 'import MySQLdb' 2>/dev/null || USAR_PYMYSQL=1
 else
-    aviso "mysqlclient no compilo en este servidor. Uso PyMySQL, que es Python puro."
-    "$PIP" install --quiet -r "$BACKEND/requirements.txt"
-    "$PIP" install --quiet "PyMySQL==1.1.2"
-    USAR_PYMYSQL=1
-    ok "Dependencias instaladas (driver PyMySQL)"
+    nota "Esto puede tardar un par de minutos..."
+    "$PY" -m pip install "${PIP_OPCIONES[@]}" --upgrade pip
+
+    if "$PIP" install "${PIP_OPCIONES[@]}" -r "$BACKEND/requirements-produccion.txt"; then
+        ok "Dependencias instaladas (driver mysqlclient)"
+    else
+        aviso "mysqlclient no compilo en este servidor. Uso PyMySQL, que es Python puro."
+        "$PIP" install "${PIP_OPCIONES[@]}" -r "$BACKEND/requirements.txt" \
+            || morir "No se pudieron instalar las dependencias. Suele ser falta de espacio: mira 'du -sm ~' y libera con 'rm -rf ~/.cache/pip ~/www/EspolAcademicsManage'."
+        "$PIP" install "${PIP_OPCIONES[@]}" "PyMySQL==1.1.2"
+        USAR_PYMYSQL=1
+        ok "Dependencias instaladas (driver PyMySQL)"
+    fi
 fi
+
+# Comprobacion: si Django no se puede importar, el sitio arrancaria con
+# "ModuleNotFoundError: No module named 'django'" en el log de uWSGI.
+VERSION_DJANGO="$("$PY" -c 'import django; print(django.get_version())' 2>/dev/null || true)"
+[ -n "$VERSION_DJANGO" ] || morir "Django no quedo instalado en $VENV. Reinstalalo con:
+    $PIP install --no-cache-dir -r $BACKEND/requirements.txt
+  Si falla por espacio, libera con: rm -rf ~/.cache/pip"
+ok "Django $VERSION_DJANGO listo en el entorno virtual"
+
+VER_VENV="$("$PY" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
 
 # ── 4. archivo .env ──────────────────────────────────────────────────────────
 paso "4/8  Configuracion (.env)"
@@ -256,7 +288,21 @@ else
 fi
 
 # ── 7. API publica ───────────────────────────────────────────────────────────
-paso "7/8  Comprobando la API publica (/api/)"
+paso "7/8  Comprobando el arranque del sitio y la API"
+
+# Esto es exactamente lo que hace uWSGI al levantar el sitio. Si falla aqui,
+# en el panel veras "Connection to upstream failed" y en el log el traceback.
+ERROR_WSGI="$(mktemp)"
+if "$PY" -c 'from config.wsgi import application' 2>"$ERROR_WSGI"; then
+    rm -f "$ERROR_WSGI"
+    ok "config/wsgi.py carga correctamente (Python $VER_VENV)"
+else
+    printf '\n'
+    sed 's/^/   /' "$ERROR_WSGI" >&2
+    rm -f "$ERROR_WSGI"
+    printf '\n'
+    morir "El sitio no puede arrancar. Ese traceback es el que veras en ~/admin/logs/uwsgi/*.log"
+fi
 
 CLAVE_API="$(grep -m1 '^API_CLAVE=' "$BACKEND/.env" | cut -d= -f2- || true)"
 
@@ -321,7 +367,11 @@ Ahora, en el panel: Web → Sitios → Añadir un sitio (o editar el existente)
   Ruta de la aplicacion .... \$HOME/www/$PROYECTO/backend/config/wsgi.py
   Directorio de trabajo .... \$HOME/www/$PROYECTO/backend
   Entorno virtual .......... \$HOME/venv-espol
-  Version de Python ........ $PYVER      <-- tiene que coincidir
+  Version de Python ........ $VER_VENV      <-- tiene que coincidir
+
+  Esa version es la del entorno virtual ($VENV). Si en el panel eliges otra,
+  uWSGI arranca con un Python que no ve los paquetes y el log dira:
+  "ModuleNotFoundError: No module named 'django'".
 
 Guarda, pulsa Reiniciar, y abre:
 
@@ -342,6 +392,6 @@ Si sale "Connection to upstream failed", el detalle esta en:
 
   tail -50 ~/admin/logs/sites/*
 
-La causa numero uno es que la Version de Python del sitio no sea $PYVER.
+La causa numero uno es que la Version de Python del sitio no sea $VER_VENV.
 
 RESUMEN

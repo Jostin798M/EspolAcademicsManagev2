@@ -645,6 +645,7 @@ python manage.py collectstatic --noinput
 | **`Access denied for user`** | Usuario, contraseña o host de MySQL mal escritos en el `.env`. Verifícalos en **Bases de datos → MySQL**. |
 | **`mysqlclient ... is required`** | Instalaste PyMySQL sin activarlo. Agrega `DB_DRIVER=pymysql` al `.env` y reinicia. |
 | **`error: command 'gcc' failed` al instalar mysqlclient** | Usa el driver alternativo: `pip install PyMySQL==1.1.2` y `DB_DRIVER=pymysql` en el `.env`. |
+| **`ModuleNotFoundError: No module named 'django'`** en `~/admin/logs/uwsgi/*.log` | uWSGI arranca con un Python que no ve los paquetes del entorno virtual. Dos causas: (a) la **Version de Python** del sitio no coincide con la del venv — compruébalo con `ls ~/venv-espol/lib/`; (b) `pip` se quedó sin espacio y dejó el venv a medias — verifícalo con `~/venv-espol/bin/python -c "import django"` y reinstala con `~/venv-espol/bin/pip install --no-cache-dir -r ~/www/EspolAcademicsManagev2/backend/requirements.txt`. |
 | **`ModuleNotFoundError: No module named 'config'`** | El *Working directory* del sitio no apunta a `.../EspolAcademicsManagev2/backend`. Corrígelo en el Paso 7. |
 | **`SyntaxError` o `Django requires Python 3.12`** | El entorno virtual se creó con una versión vieja de Python. Bórralo (`rm -rf ~/venv-espol`) y repite el Paso 4 con una versión más alta, o baja a `Django==5.2.11`. |
 | **La página queda en blanco tras un cambio** | Falta reiniciar el sitio en el panel. |
