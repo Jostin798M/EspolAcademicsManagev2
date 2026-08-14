@@ -178,9 +178,11 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 
 # ── API PUBLICA (/api/) ───────────────────────────────────────
-# Se entra de dos formas y basta con una (ver api/seguridad.py):
+# Se entra de tres formas y basta con una (ver api/seguridad.py):
 #   1. sesion iniciada en el sitio con un usuario SUPERADMIN;
-#   2. clave en el encabezado X-API-Key.
+#   2. token pedido en POST /api/auth/login/ con las credenciales de un
+#      usuario SUPERADMIN (es la via de las otras aplicaciones);
+#   3. clave del sitio en el encabezado X-API-Key.
 #
 # API_MODO controla el catalogo academico (facultades, cursos, modulos,
 # tareas, quizzes, reportes):
@@ -197,6 +199,17 @@ API_ROLES = env_list('API_ROLES', 'SUPERADMIN')
 # Clave para programas externos (curl, otra aplicacion). Es opcional:
 # si queda vacia, solo se entra con sesion de super administrador.
 API_CLAVE = os.environ.get('API_CLAVE', '').strip()
+
+# Tokens que se entregan a otras aplicaciones en /api/auth/login/.
+# API_TOKEN_DIAS = duracion por defecto (0 = no caduca).
+# API_TOKEN_DIAS_MAX = lo maximo que puede pedir la aplicacion en "dias".
+API_TOKEN_DIAS = int(os.environ.get('API_TOKEN_DIAS', '30'))
+API_TOKEN_DIAS_MAX = int(os.environ.get('API_TOKEN_DIAS_MAX', '365'))
+
+# Freno a la fuerza bruta en /api/auth/login/: intentos fallidos permitidos
+# por IP y correo, y minutos que dura el bloqueo.
+API_LOGIN_INTENTOS = int(os.environ.get('API_LOGIN_INTENTOS', '10'))
+API_LOGIN_BLOQUEO_MIN = int(os.environ.get('API_LOGIN_BLOQUEO_MIN', '5'))
 
 # Dominios autorizados a consultar la API desde un navegador.
 # '*' = cualquiera. Ejemplo: API_ORIGENES=https://misitio.com,https://otro.com

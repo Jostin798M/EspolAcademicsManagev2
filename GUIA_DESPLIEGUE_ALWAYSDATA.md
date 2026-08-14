@@ -13,6 +13,7 @@ Al terminar tendrás funcionando en `https://jostin.alwaysdata.net`:
 | `/cursos/…` | CRUD de facultades, cursos, fórmula, inscripciones, módulos, materiales, progreso |
 | `/evaluaciones/…` | CRUD de tareas, entregas, quizzes, preguntas, respuestas |
 | `/api/` | **API pública de consulta externa (JSON)** — ver *Paso 8 bis* |
+| `/api/auth/…` | Login de otras aplicaciones: token de super administrador |
 | `/admin/` | Panel de administración de Django |
 
 > **Esta guía ya está personalizada** para la cuenta `jostin`
@@ -457,23 +458,37 @@ Python) puedan consultarlos desde fuera del servidor.
 
 Características:
 
-- **Solo lectura.** Únicamente acepta `GET`; cualquier otro método responde `405`.
-  Nada de lo que hay en la API puede modificar la base de datos.
+- **Solo lectura.** Los datos únicamente se consultan con `GET`; ninguna ruta
+  de la API modifica el contenido académico de la base. Las dos únicas rutas
+  `POST` son las de identificarse (`/api/auth/login/` y `/api/auth/logout/`).
 - **Sin dependencias nuevas.** Está hecha con Django puro (`JsonResponse`), no
   con Django REST Framework, para no consumir la cuota de 100 MB de la cuenta.
 - **CORS habilitado**, así que se puede llamar desde el navegador de otro sitio.
-- **Dos formas de entrar**, y basta con una: tu **sesión de super administrador**
-  (nada que escribir) o una **clave** para programas externos.
+- **Tres formas de entrar**, y basta con una: tu **sesión de super
+  administrador** (nada que escribir), un **token** que otra aplicación pide
+  con las credenciales de un super administrador, o una **clave** fija del
+  sitio para tus propios scripts.
+- **Pensada para que la consuman otras apps.** La aplicación de un tercero, con
+  su propio sistema de login, cambia el correo y la contraseña de su usuario por
+  un token; si esa cuenta es **SUPERADMIN** en esta base de datos obtiene acceso
+  completo, y si no, recibe siempre el mismo aviso:
+  `No se ha autorizado que sea un super admin.`
 
 ### Cómo se autentica
 
-El módulo `backend/api/seguridad.py` decide quién entra. Hay dos vías y basta
+El módulo `backend/api/seguridad.py` decide quién entra. Hay tres vías y basta
 con cumplir una:
 
 | Vía | Para qué sirve | Cómo |
 |---|---|---|
 | **Sesión** | Mirar la API tú, desde el navegador | Inicia sesión en `/admin/` con un usuario de rol **SUPERADMIN** y abre la API en la misma ventana. No hay claves de por medio. |
-| **Clave** | Programas externos (curl, otra app, un script) que no tienen sesión ni cookies | Encabezado `X-API-Key: <clave>` (o `?clave=<clave>`) |
+| **Token** | **Otras aplicaciones** con su propio login | `POST /api/auth/login/` con el correo y la contraseña de un **SUPERADMIN** de esta base; luego `Authorization: Bearer <token>` en cada petición |
+| **Clave** | Tus propios scripts, sin usuario detrás | Encabezado `X-API-Key: <clave>` (o `?clave=<clave>`) |
+
+La diferencia entre el token y la clave: el **token pertenece a una persona**
+(se sabe quién consulta, se revoca solo a esa aplicación y deja de servir en el
+momento en que esa cuenta deja de ser super administrador), mientras que la
+**clave es única para todo el sitio** y no distingue quién la usa.
 
 Un superusuario de Django entra siempre, tenga el rol que tenga. Puedes ampliar
 los roles con `API_ROLES=SUPERADMIN,ADMIN` en el `.env`.
@@ -489,7 +504,8 @@ formas:
 | `API_MODO=privada` *(por defecto)* | Abiertos | Sesión o clave | Sesión o clave |
 | `API_MODO=publica` | Abiertos | Abiertos a cualquiera | Sesión o clave |
 
-`/api/` y `/api/estado/` nunca piden nada: el índice no devuelve datos del
+`/api/auth/login/` tampoco pide nada: es justamente la puerta por la que se
+entra. `/api/` y `/api/estado/` nunca piden nada: el índice no devuelve datos del
 sistema y el estado sirve para monitorear el servicio (sus totales sí se ocultan
 a quien no se identifica). Al abrir `https://jostin.alwaysdata.net/api/` en el
 navegador ves la lista de recursos y **si tu sesión actual está autorizada**:
@@ -530,12 +546,136 @@ Si no recuerdas la clave, está en el servidor:
 grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env
 ```
 
+#### Desde otra aplicación con su propio login (la vía recomendada)
+
+Este es el caso de una app de terceros: tiene sus propios usuarios, y quiere
+saber si el que acaba de entrar es super administrador **en esta base de datos**
+para darle acceso a la API completa.
+
+**Paso 1 — pedir el token.** La otra aplicación envía el correo y la contraseña
+que su usuario tiene en ESPOL Academics:
+
+```bash
+curl -X POST https://jostin.alwaysdata.net/api/auth/login/ \
+  -H "Content-Type: application/json" \
+  -d '{"correo": "tu@espol.edu.ec", "password": "TU_CONTRASENA",
+       "aplicacion": "Nombre de la app", "dias": 30}'
+```
+
+Si la cuenta es **SUPERADMIN**, la respuesta trae el token (`200`):
+
+```json
+{
+  "ok": true,
+  "datos": {
+    "autorizado": true,
+    "token": "Ijh9SD5-3gkSu61mFRy1wJpzfImhMsMSZ7vXbVA45xzM0dGF",
+    "tipo": "Bearer",
+    "expira": "2026-09-12T02:53:52+00:00",
+    "usuario": { "correo": "tu@espol.edu.ec", "rol": "SUPERADMIN", "es_superadmin": true },
+    "acceso": "completo"
+  }
+}
+```
+
+Y si **no** lo es, aunque el correo y la contraseña sean correctos (`403`):
+
+```json
+{
+  "ok": false,
+  "error": "No se ha autorizado que sea un super admin.",
+  "codigo": 403,
+  "autorizado": false,
+  "motivo": "no_superadmin",
+  "detalle": "La cuenta ana.paredes@espol.edu.ec tiene rol USER; la API solo la usan los roles SUPERADMIN.",
+  "usuario": { "correo": "ana.paredes@espol.edu.ec", "rol": "USER", "es_superadmin": false }
+}
+```
+
+> El texto del token **solo se muestra una vez**. Guárdalo en el servidor de la
+> otra aplicación (nunca en el navegador ni en el código fuente). En la base de
+> datos de ESPOL Academics no se guarda el token, sino su huella SHA-256, así
+> que nadie puede recuperarlo mirando la tabla `token_api`.
+>
+> El campo `dias` es opcional (por defecto `API_TOKEN_DIAS=30`, máximo
+> `API_TOKEN_DIAS_MAX`). Tras diez intentos fallidos con el mismo correo desde
+> la misma IP el login responde `429` durante unos minutos.
+
+**Paso 2 — usar el token en cada petición:**
+
+```bash
+curl -H "Authorization: Bearer TU_TOKEN" https://jostin.alwaysdata.net/api/usuarios/
+```
+
+Si algún servidor intermedio se come el encabezado `Authorization`, sirve
+igual `X-API-Token: TU_TOKEN`.
+
+**Paso 3 — preguntar en cualquier momento si sigue autorizado.** Es la ruta que
+la otra aplicación consulta para decidir si le enseña o no la sección de
+administración a su usuario:
+
+```bash
+curl -H "Authorization: Bearer TU_TOKEN" https://jostin.alwaysdata.net/api/auth/verificar/
+```
+
+```json
+{
+  "ok": true,
+  "datos": {
+    "autorizado": true,
+    "via": "token",
+    "mensaje": "Sesion de super administrador confirmada.",
+    "usuario": { "correo": "tu@espol.edu.ec", "rol": "SUPERADMIN", "es_superadmin": true },
+    "acceso": "completo",
+    "token": { "prefijo": "Ijh9SD5-3gkS", "aplicacion": "Nombre de la app", "expira": "..." }
+  }
+}
+```
+
+Sin token, con un token caducado o con una cuenta que ya no es super
+administrador, responde `401`/`403` con **el mismo mensaje de siempre** y un
+`motivo` que la aplicación puede leer sin interpretar el texto:
+
+```json
+{ "ok": false, "error": "No se ha autorizado que sea un super admin.",
+  "autorizado": false, "motivo": "sin_credenciales", "como_autorizarse": { "...": "..." } }
+```
+
+| `motivo` | Qué hacer en la otra aplicación |
+|---|---|
+| `sin_credenciales` | No mandaste token: pide el login |
+| `credenciales_invalidas` | Correo o contraseña mal escritos |
+| `no_superadmin` | La cuenta existe pero no es SUPERADMIN: muéstrale el aviso |
+| `cuenta_inactiva` | La cuenta está desactivada en ESPOL Academics |
+| `token_invalido` / `token_revocado` / `token_caducado` | Vuelve a pedir un token en `/api/auth/login/` |
+| `demasiados_intentos` | Espera unos minutos antes de reintentar |
+
+**Paso 4 — cerrar sesión.** Cuando el usuario sale de la otra aplicación, esta
+devuelve el token para que no siga sirviendo:
+
+```bash
+curl -X POST -H "Authorization: Bearer TU_TOKEN" \
+  https://jostin.alwaysdata.net/api/auth/logout/
+```
+
+Con `-d '{"todos": true}'` (y `Content-Type: application/json`) revoca **todos**
+los tokens de esa cuenta, que es lo que hay que hacer si uno se filtró. También
+puedes revocarlos a mano desde `/admin/` → **Tokens de API**, donde se ve qué
+aplicación tiene acceso y cuándo lo usó por última vez.
+
+**El rol se comprueba en cada petición.** Si le quitas el rol SUPERADMIN a una
+cuenta (o la marcas como inactiva), sus tokens dejan de funcionar en ese mismo
+instante, sin esperar a que caduquen.
+
 ### Recursos disponibles
 
 | Método y ruta | Qué devuelve |
 |---|---|
 | `GET /api/` | Índice: lista todos los recursos, filtros y opciones de paginación |
 | `GET /api/estado/` | Salud del servicio: versión, conexión a la base y totales |
+| `POST /api/auth/login/` | Cambia correo + contraseña de un SUPERADMIN por un token |
+| `GET /api/auth/verificar/` | ¿Quien pregunta está identificado como super administrador? |
+| `POST /api/auth/logout/` | Revoca el token con el que se llama |
 | `GET /api/facultades/` | Listado de facultades con su número de cursos |
 | `GET /api/facultades/<código>/` | Una facultad y sus cursos (ej. `FIEC`) |
 | `GET /api/cursos/` | Catálogo de cursos (paginado) |
@@ -595,37 +735,86 @@ Todo viene envuelto igual, de modo que el cliente siempre revisa `ok` primero:
 Y los errores, también en JSON (nunca una página HTML de Django):
 
 ```json
-{ "ok": false, "error": "Clave de API invalida o ausente. Envia el encabezado X-API-Key.", "codigo": 401 }
+{
+  "ok": false,
+  "error": "No se ha autorizado que sea un super admin.",
+  "codigo": 401,
+  "autorizado": false,
+  "motivo": "sin_credenciales",
+  "detalle": "No se recibio ninguna credencial valida (sesion, token o clave).",
+  "como_autorizarse": { "token": { "paso_1": "POST /api/auth/login/ ...", "paso_2": "..." } }
+}
 ```
 
 | Código | Significado |
 |---|---|
 | `200` | Todo bien |
-| `400` | Un parámetro mal escrito (por ejemplo `estado=inventado`) |
-| `401` | No te identificaste: ni sesión de SUPERADMIN ni clave válida |
+| `400` | Un parámetro mal escrito (por ejemplo `estado=inventado`) o faltan credenciales en el login |
+| `401` | No te identificaste: ni sesión de SUPERADMIN, ni token válido, ni clave |
+| `403` | Te identificaste bien, pero esa cuenta **no es super administrador** |
 | `404` | El curso, la facultad o la ruta no existen |
-| `405` | Se usó `POST`, `PUT` o `DELETE`: la API es de solo lectura |
+| `405` | Se usó `PUT`/`DELETE`, o `POST` en una ruta que no es de `/api/auth/` |
+| `429` | Demasiados intentos fallidos de login con ese correo |
 
 ### Ejemplo de consumo desde otra aplicación
 
 ```javascript
+// Aplicación de terceros: primero cambia las credenciales por un token
+// (esto va en TU servidor, no en el navegador del usuario).
+const API = "https://jostin.alwaysdata.net/api";
+
+const entrada = await fetch(`${API}/auth/login/`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ correo, password, aplicacion: "Mi App" }),
+});
+
+const sesion = await entrada.json();
+
+if (!sesion.ok) {
+  // "No se ha autorizado que sea un super admin."
+  mostrarAviso(sesion.error, sesion.motivo);
+} else {
+  const token = sesion.datos.token;   // guárdalo, no se vuelve a mostrar
+
+  const respuesta = await fetch(`${API}/cursos/?estado=activo`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const { ok, datos } = await respuesta.json();
+  if (ok) datos.forEach(curso => console.log(curso.codigo, curso.nombre));
+}
+```
+
+```javascript
 // Desde una página del mismo dominio, con la sesión ya iniciada,
-// basta con credentials: "include" y ninguna clave.
+// basta con credentials: "include" y ningún token.
 const RESPUESTA = await fetch(
   "https://jostin.alwaysdata.net/api/cursos/?estado=activo",
-  { headers: { "X-API-Key": "TU_CLAVE" }, credentials: "include" },
+  { credentials: "include" },
 );
-
-const { ok, datos } = await RESPUESTA.json();
-if (ok) datos.forEach(curso => console.log(curso.codigo, curso.nombre));
 ```
 
 ```python
 import requests
 
+API = "https://jostin.alwaysdata.net/api"
+
+sesion = requests.post(
+    f"{API}/auth/login/",
+    json={"correo": "tu@espol.edu.ec", "password": "TU_CONTRASENA",
+          "aplicacion": "Script de reportes"},
+    timeout=10,
+).json()
+
+if not sesion["ok"]:
+    raise SystemExit(sesion["error"])   # No se ha autorizado que sea un super admin.
+
+cabeceras = {"Authorization": "Bearer " + sesion["datos"]["token"]}
+
 r = requests.get(
-    "https://jostin.alwaysdata.net/api/cursos/",
-    headers={"X-API-Key": "TU_CLAVE"},
+    f"{API}/cursos/",
+    headers=cabeceras,
     params={"facultad": "FIEC"},
     timeout=10,
 )
@@ -647,7 +836,7 @@ API_ORIGENES=https://mi-otra-app.com,https://jostin.alwaysdata.net
 En tu computadora, con el entorno virtual activado y dentro de `backend/`:
 
 ```bash
-python manage.py test api        # 18 pruebas del módulo
+python manage.py test api        # 57 pruebas del módulo
 python manage.py runserver       # luego abre http://127.0.0.1:8000/api/
 ```
 
@@ -718,6 +907,10 @@ python manage.py collectstatic --noinput
 | **`401` al abrir la API en el navegador** | No has iniciado sesión, o el usuario con el que entraste no es `SUPERADMIN`. Entra en `/admin/` y vuelve a la dirección; comprueba tu rol en `/api/` (`acceso_actual`). También sirve añadir `?clave=TU_CLAVE`. |
 | **`401` con la clave puesta** | No coincide con `API_CLAVE` del `.env`, o el `.env` cambió y falta reiniciar el sitio. Compruébala con `grep API_CLAVE ~/www/EspolAcademicsManagev2/backend/.env`. |
 | **`/api/usuarios/` responde `503`** | `API_CLAVE` está vacía en el `.env`. Ponle un valor y reinicia el sitio. |
+| **`403` con `"motivo": "no_superadmin"` al hacer login** | El correo y la contraseña son correctos, pero esa cuenta no tiene rol `SUPERADMIN`. Cámbiaselo en `/admin/` → *Usuarios*, o amplía `API_ROLES` en el `.env`. |
+| **`401` con `"motivo": "token_caducado"` o `"token_revocado"`** | El token venció (`API_TOKEN_DIAS`) o alguien lo revocó desde `/admin/` → *Tokens de API*. La aplicación tiene que volver a `POST /api/auth/login/`. |
+| **El token deja de servir de golpe** | A esa cuenta le quitaron el rol `SUPERADMIN` o la marcaron inactiva: el rol se comprueba en cada petición. Compruébalo en `/api/auth/verificar/` (`detalle`). |
+| **`429` al iniciar sesión** | Diez intentos fallidos con ese correo desde la misma IP. Espera `API_LOGIN_BLOQUEO_MIN` minutos. |
 | **`/api/` devuelve HTML en vez de JSON** | La ruta `path('api/', include('api.urls'))` quedó **después** del `re_path` que sirve el frontend en `config/urls.py`, o falta `'api'` en `INSTALLED_APPS`. |
 | **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. Ojo: para usar la **sesión** desde otro dominio hay que listarlo explícitamente — con `*` el navegador no envía cookies, y ahí solo funciona la clave. |
 

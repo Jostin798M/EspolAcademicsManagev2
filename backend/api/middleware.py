@@ -46,6 +46,9 @@ class CorsApiMiddleware:
         else:
             return
 
-        respuesta['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
-        respuesta['Access-Control-Allow-Headers'] = 'X-API-Key, Content-Type'
+        # POST solo lo usan las rutas de /api/auth/ (login y logout).
+        respuesta['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        respuesta['Access-Control-Allow-Headers'] = (
+            'Authorization, X-API-Token, X-API-Key, Content-Type'
+        )
         respuesta['Access-Control-Max-Age'] = '86400'

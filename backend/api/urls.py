@@ -19,6 +19,25 @@ urlpatterns = [
         name="estado",
     ),
 
+    # Autenticacion de aplicaciones externas
+    path(
+        "auth/login/",
+        views.auth_login,
+        name="auth_login",
+    ),
+
+    path(
+        "auth/verificar/",
+        views.auth_verificar,
+        name="auth_verificar",
+    ),
+
+    path(
+        "auth/logout/",
+        views.auth_logout,
+        name="auth_logout",
+    ),
+
     # Facultades
     path(
         "facultades/",

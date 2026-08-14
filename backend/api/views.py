@@ -9,6 +9,7 @@ Todas devuelven JSON con la forma:
 La autenticacion es por clave: encabezado X-API-Key o parametro ?clave=.
 """
 from django.conf import settings
+from django.contrib.auth import authenticate
 from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -20,7 +21,18 @@ from evaluaciones.models import Quiz, Tarea
 from reportes import servicios
 
 from . import seguridad
-from .respuestas import ErrorApi, endpoint, esta_autenticado, ok, paginar
+from .models import TokenApi
+from .respuestas import (
+    ErrorApi,
+    cuerpo_json,
+    endpoint,
+    error,
+    esta_autenticado,
+    no_autorizado,
+    ok,
+    paginar,
+    texto,
+)
 from .serializadores import (
     curso_detalle_json,
     curso_json,
@@ -59,6 +71,11 @@ def indice(request):
     """
     seguridad_actual = seguridad.resumen(request)
     seguridad_actual['ejemplos'] = {
+        'otra_aplicacion': 'curl -X POST -H "Content-Type: application/json" '
+                           '-d \'{"correo":"TU_CORREO","password":"TU_CLAVE"}\' '
+                           + _url(request, 'auth_login'),
+        'con_token': 'curl -H "Authorization: Bearer TU_TOKEN" '
+                     + _url(request, 'cursos'),
         'navegador': 'Inicia sesion en '
                      + request.build_absolute_uri('/admin/')
                      + ' y abre '
@@ -80,6 +97,9 @@ def indice(request):
         },
         'recursos': {
             'estado': _url(request, 'estado'),
+            'auth_login (POST)': _url(request, 'auth_login'),
+            'auth_verificar': _url(request, 'auth_verificar'),
+            'auth_logout (POST)': _url(request, 'auth_logout'),
             'facultades': _url(request, 'facultades'),
             'facultad_detalle': _url(request, 'facultad_detalle', codigo='FIEC'),
             'cursos': _url(request, 'cursos'),
@@ -325,6 +345,218 @@ def curso_estudiantes(request, codigo):
     ).select_related('usuario', 'usuario__facultad', 'curso')
 
     return paginar(consulta, request, inscripcion_json)
+
+
+# ── Autenticacion de aplicaciones externas ───────────────────────────────────
+# Estas tres rutas son las que usa otra aplicacion con su propio login: pide
+# un token con las credenciales de un super administrador de esta base de
+# datos (login), comprueba en cualquier momento si sigue autorizada
+# (verificar) y lo devuelve cuando su usuario cierra sesion (logout).
+
+def _usuario_publico(usuario):
+    """Ficha del usuario que se devuelve a la aplicacion que pregunta."""
+    return {
+        'id_usuario': usuario.id_usuario,
+        'nombre_completo': usuario.nombre_completo,
+        'correo': usuario.correo,
+        'rol': usuario.rol,
+        'estado': usuario.estado,
+        'es_superadmin': seguridad.es_usuario_autorizado(usuario),
+        'facultad': usuario.facultad.codigo if usuario.facultad_id else None,
+    }
+
+
+def _dias_solicitados(datos):
+    """Duracion del token pedida por la aplicacion, dentro de los limites."""
+    crudo = datos.get('dias')
+
+    if crudo in (None, ''):
+        return settings.API_TOKEN_DIAS
+
+    try:
+        dias = int(crudo)
+    except (TypeError, ValueError):
+        raise ErrorApi('El campo "dias" debe ser un numero entero.')
+
+    if not 1 <= dias <= settings.API_TOKEN_DIAS_MAX:
+        raise ErrorApi(
+            f'El campo "dias" debe estar entre 1 y '
+            f'{settings.API_TOKEN_DIAS_MAX}.'
+        )
+
+    return dias
+
+
+@endpoint(abierto=True, metodos=('POST',))
+def auth_login(request):
+    """
+    Entrega un token a una aplicacion externa.
+
+    Cuerpo (JSON o formulario):
+
+        {"correo": "jefe@espol.edu.ec", "password": "...",
+         "aplicacion": "Mi App", "dias": 30}
+
+    Solo lo consigue quien se identifica con una cuenta que sea SUPERADMIN
+    en ESTA base de datos. Con cualquier otra cuenta la respuesta es 403 con
+    el mensaje "No se ha autorizado que sea un super admin.", para que la
+    aplicacion que llama pueda mostrarselo a su usuario tal cual.
+
+    El texto del token se muestra UNA sola vez: guardalo al recibirlo.
+    """
+    datos = cuerpo_json(request)
+    correo = texto(datos, 'correo', 'email', 'usuario').lower()
+    contrasena = texto(datos, 'password', 'contrasena', 'clave_acceso')
+
+    if not correo or not contrasena:
+        raise ErrorApi(
+            'Faltan credenciales: envia "correo" y "password" en el cuerpo.',
+            400,
+            motivo='faltan_credenciales',
+        )
+
+    if seguridad.intentos_disponibles(request, correo) <= 0:
+        raise ErrorApi(
+            'Demasiados intentos fallidos con este correo. '
+            f'Espera {settings.API_LOGIN_BLOQUEO_MIN} minutos.',
+            429,
+            motivo='demasiados_intentos',
+        )
+
+    usuario = authenticate(request, correo=correo, password=contrasena)
+
+    if usuario is None:
+        seguridad.anotar_intento_fallido(request, correo)
+
+        return error(
+            'Correo o contrasena incorrectos.',
+            401,
+            autorizado=False,
+            motivo='credenciales_invalidas',
+            intentos_restantes=seguridad.intentos_disponibles(request, correo),
+        )
+
+    seguridad.olvidar_intentos(request, correo)
+
+    if not seguridad.cuenta_activa(usuario):
+        return error(
+            seguridad.NO_AUTORIZADO,
+            403,
+            autorizado=False,
+            motivo=seguridad.CUENTA_INACTIVA,
+            detalle=f'La cuenta {usuario.correo} esta inactiva.',
+            usuario=_usuario_publico(usuario),
+        )
+
+    if not seguridad.es_usuario_autorizado(usuario):
+        # Credenciales correctas, pero la cuenta no es de super admin.
+        return error(
+            seguridad.NO_AUTORIZADO,
+            403,
+            autorizado=False,
+            motivo=seguridad.NO_SUPERADMIN,
+            detalle=f'La cuenta {usuario.correo} tiene rol {usuario.rol}; '
+                    f'la API solo la usan los roles '
+                    f'{", ".join(seguridad.roles_permitidos())}.',
+            usuario=_usuario_publico(usuario),
+        )
+
+    token, plano = TokenApi.objects.crear(
+        usuario,
+        aplicacion=texto(datos, 'aplicacion', 'app', 'cliente'),
+        dias=_dias_solicitados(datos),
+        ip=seguridad.ip_de(request) or None,
+    )
+
+    return ok({
+        'autorizado': True,
+        'token': plano,
+        'tipo': 'Bearer',
+        'expira': token.expira.isoformat() if token.expira else None,
+        'creado': token.creado.isoformat(),
+        'usuario': _usuario_publico(usuario),
+        'acceso': 'completo',
+        'como_usarlo': {
+            'encabezado': 'Authorization: Bearer ' + plano,
+            'alternativa': 'X-API-Token: ' + plano,
+            'verificar': _url(request, 'auth_verificar'),
+            'indice': _url(request, 'indice'),
+            'aviso': 'El token no se vuelve a mostrar. Guardalo en el '
+                     'servidor de tu aplicacion, nunca en el navegador.',
+        },
+    })
+
+
+@endpoint(abierto=True)
+def auth_verificar(request):
+    """
+    Dice si quien pregunta esta identificado como super administrador.
+
+    Es la ruta que consulta otra aplicacion para saber si su usuario tiene
+    acceso. Responde 200 con los datos del super administrador, o 401/403
+    con "No se ha autorizado que sea un super admin." y el motivo exacto.
+    En los dos casos el cuerpo trae el campo "autorizado".
+    """
+    # privado=True: aunque el catalogo este en modo publico, aqui se
+    # pregunta por el super administrador, no por el acceso anonimo.
+    acceso = seguridad.autorizar(request, privado=True)
+
+    if not acceso:
+        return no_autorizado(request, acceso)
+
+    datos = {
+        'autorizado': True,
+        'via': acceso.via,
+        'mensaje': 'Sesion de super administrador confirmada.',
+        'usuario': _usuario_publico(acceso.usuario) if acceso.usuario else None,
+        'roles_permitidos': seguridad.roles_permitidos(),
+        'acceso': 'completo',
+    }
+
+    if acceso.token:
+        datos['token'] = {
+            'prefijo': acceso.token.prefijo,
+            'aplicacion': acceso.token.aplicacion or None,
+            'creado': acceso.token.creado.isoformat(),
+            'expira': acceso.token.expira.isoformat() if acceso.token.expira else None,
+        }
+
+    return ok(datos)
+
+
+@endpoint(metodos=('POST',))
+def auth_logout(request):
+    """
+    Revoca el token con el que se llama (cierre de sesion de la aplicacion).
+
+    Con {"todos": true} revoca todos los tokens de esa cuenta, util cuando
+    se sospecha que uno se filtro.
+    """
+    acceso = request.acceso
+
+    if not acceso.token:
+        raise ErrorApi(
+            'Esta ruta revoca el token del encabezado Authorization y no se '
+            'ha recibido ninguno.',
+            400,
+            motivo='sin_token',
+        )
+
+    datos = cuerpo_json(request)
+    todos = str(datos.get('todos', '')).strip().lower() in ('1', 'true', 'si', 'yes')
+
+    if todos:
+        revocados = TokenApi.objects.filter(
+            usuario=acceso.token.usuario, revocado=False,
+        ).update(revocado=True)
+    else:
+        acceso.token.revocar()
+        revocados = 1
+
+    return ok({
+        'revocados': revocados,
+        'mensaje': 'Token revocado. Vuelve a /api/auth/login/ para obtener otro.',
+    })
 
 
 # ── Ruta no encontrada dentro de /api/ ───────────────────────────────────────
