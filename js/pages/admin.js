@@ -2,7 +2,7 @@
 function initAdminPage(titulo) {
   const usuario = Auth.getUsuarioActivo();
   if (!usuario || usuario.rol !== "ADMIN") {
-    window.location.href = BASE_PATH + "index.html";
+    window.location.href = LOGIN;
     return null;
   }
   Sidebar.inject(usuario, window.location.pathname);

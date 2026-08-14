@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Dashboard — SuperAdmin</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-  <link rel="stylesheet" href="../../css/main.css">
-  <link rel="stylesheet" href="../../css/components.css">
-  <link rel="stylesheet" href="../../css/dashboard.css">
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/components.css">
+  <link rel="stylesheet" href="/css/dashboard.css">
 </head>
 <body>
 <div class="app-layout">
@@ -87,7 +87,7 @@
       <div class="card">
         <div class="card-header">
           <h4><i class="bi-building text-primary"></i> Resumen por Facultad</h4>
-          <a href="facultades.html" class="btn btn-ghost btn-sm">Ver todas <i class="bi-arrow-right"></i></a>
+          <a href="facultades" class="btn btn-ghost btn-sm">Ver todas <i class="bi-arrow-right"></i></a>
         </div>
         <div class="card-body" style="padding:0">
           <div id="lista-facultades-mobile" class="mobile-cards" style="padding:16px"></div>
@@ -113,11 +113,11 @@
   </div>
 </div>
 
-<script src="../../js/data/mockdata.js"></script>
-<script src="../../js/api.js"></script>
-<script src="../../js/components/sidebar.js"></script>
-<script src="../../js/pages/auth.js"></script>
-<script src="../../js/pages/superadmin.js"></script>
+<script src="/js/data/mockdata.js"></script>
+<script src="/js/api.js"></script>
+<script src="/js/components/sidebar.js"></script>
+<script src="/js/pages/auth.js"></script>
+<script src="/js/pages/superadmin.js"></script>
 <script>
   document.getElementById("fecha-hoy").textContent =
     new Date().toLocaleDateString("es-EC", { weekday:"long", day:"numeric", month:"long", year:"numeric" });

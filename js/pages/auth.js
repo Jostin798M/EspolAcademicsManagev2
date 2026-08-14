@@ -30,7 +30,16 @@ const Auth = {
     try {
       const data = await API.login(correo, password);
       const usuario = data.usuario;
-      sessionStorage.setItem("usuario_id", usuario.id);
+
+      /* El backend manda "id"; si respondiera una version antigua sin ese
+         campo, se guardaria un id vacio y la propia pagina de destino nos
+         echaria de vuelta aqui. Mejor decirlo claro. */
+      const id = usuario.id ?? usuario.id_usuario;
+      if (!id) throw new Error(
+        "El servidor respondio sin identificar al usuario. " +
+        "Reinicia el sitio para que cargue la ultima version.");
+
+      sessionStorage.setItem("usuario_id", id);
       sessionStorage.setItem("usuario_data", JSON.stringify(usuario));
       if (data.rol_activo) sessionStorage.setItem("rol_activo", data.rol_activo);
       this.redirigir(usuario);
@@ -43,13 +52,13 @@ const Auth = {
 
   redirigir(usuario) {
     const rutas = {
-      SUPERADMIN: BASE_PATH + "pages/superadmin/dashboard.html",
-      ADMIN:      BASE_PATH + "pages/admin/dashboard.html",
+      SUPERADMIN: "/superadmin/dashboard",
+      ADMIN:      "/facultad/dashboard",
       USER:       sessionStorage.getItem("rol_activo") === "PROFESOR"
-                    ? BASE_PATH + "pages/profesor/mis-cursos.html"
-                    : BASE_PATH + "pages/estudiante/mis-cursos.html"
+                    ? "/profesor/mis-cursos"
+                    : "/estudiante/mis-cursos"
     };
-    window.location.href = rutas[usuario.rol] || BASE_PATH + "index.html";
+    window.location.href = rutas[usuario.rol] || LOGIN;
   },
 
   /* Un solo "Salir": cierra la sesion de Django (y con ella el acceso
@@ -57,17 +66,17 @@ const Auth = {
   async logout() {
     try { await API.logout(); } catch { /* en modo demo no hay servidor */ }
     sessionStorage.clear();
-    window.location.href = BASE_PATH + "index.html";
+    window.location.href = LOGIN;
   },
 
   getUsuarioActivo() {
     const id = parseInt(sessionStorage.getItem("usuario_id"));
-    if (!id) { window.location.href = BASE_PATH + "index.html"; return null; }
+    if (!id) { window.location.href = LOGIN; return null; }
     try {
       const data = sessionStorage.getItem("usuario_data");
       return data ? JSON.parse(data) : null;
     } catch {
-      window.location.href = BASE_PATH + "index.html";
+      window.location.href = LOGIN;
       return null;
     }
   },

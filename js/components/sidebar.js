@@ -34,25 +34,25 @@ const Sidebar = {
 
   menus: {
     SUPERADMIN: [
-      { label: "Dashboard",   icon: "bi-grid-1x2",     href: BASE_PATH + "pages/superadmin/dashboard.html" },
-      { label: "Usuarios",    icon: "bi-people",        href: BASE_PATH + "pages/superadmin/usuarios.html" },
-      { label: "Facultades",  icon: "bi-building",      href: BASE_PATH + "pages/superadmin/facultades.html" },
-      { label: "Reportes",    icon: "bi-bar-chart",     href: BASE_PATH + "pages/superadmin/reportes.html" },
-      { label: "Configuracion",icon:"bi-gear",          href: BASE_PATH + "pages/superadmin/configuracion.html" }
+      { label: "Dashboard",   icon: "bi-grid-1x2",     href: "/superadmin/dashboard" },
+      { label: "Usuarios",    icon: "bi-people",        href: "/superadmin/usuarios" },
+      { label: "Facultades",  icon: "bi-building",      href: "/superadmin/facultades" },
+      { label: "Reportes",    icon: "bi-bar-chart",     href: "/superadmin/reportes" },
+      { label: "Configuracion",icon:"bi-gear",          href: "/superadmin/configuracion" }
     ],
     ADMIN: [
-      { label: "Dashboard",   icon: "bi-grid-1x2",     href: BASE_PATH + "pages/admin/dashboard.html" },
-      { label: "Usuarios",    icon: "bi-people",        href: BASE_PATH + "pages/admin/usuarios.html" },
-      { label: "Cursos",      icon: "bi-book",          href: BASE_PATH + "pages/admin/cursos.html" },
-      { label: "Reportes",    icon: "bi-bar-chart",     href: BASE_PATH + "pages/admin/reportes.html" }
+      { label: "Dashboard",   icon: "bi-grid-1x2",     href: "/facultad/dashboard" },
+      { label: "Usuarios",    icon: "bi-people",        href: "/facultad/usuarios" },
+      { label: "Cursos",      icon: "bi-book",          href: "/facultad/cursos" },
+      { label: "Reportes",    icon: "bi-bar-chart",     href: "/facultad/reportes" }
     ],
     PROFESOR: [
-      { label: "Mis Cursos",  icon: "bi-book-half",     href: BASE_PATH + "pages/profesor/mis-cursos.html" }
+      { label: "Mis Cursos",  icon: "bi-book-half",     href: "/profesor/mis-cursos" }
     ],
     ESTUDIANTE: [
-      { label: "Mis Cursos",  icon: "bi-book-half",     href: BASE_PATH + "pages/estudiante/mis-cursos.html" },
-      { label: "Calificaciones",icon:"bi-award",        href: BASE_PATH + "pages/estudiante/calificaciones.html" },
-      { label: "Progreso",    icon: "bi-graph-up-arrow",href: BASE_PATH + "pages/estudiante/progreso.html" }
+      { label: "Mis Cursos",  icon: "bi-book-half",     href: "/estudiante/mis-cursos" },
+      { label: "Calificaciones",icon:"bi-award",        href: "/estudiante/calificaciones" },
+      { label: "Progreso",    icon: "bi-graph-up-arrow",href: "/estudiante/progreso" }
     ]
   },
 

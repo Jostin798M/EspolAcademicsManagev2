@@ -1,9 +1,10 @@
 from django.conf import settings
 from django.contrib import admin
 from django.urls import include, path, re_path
+from django.views.generic import RedirectView
 from django.views.static import serve
 
-from .views import PanelInicioView
+from .views import PanelInicioView, login_sitio, pagina_antigua, pagina_sitio
 
 FRONTEND = settings.FRONTEND_DIR
 
@@ -20,9 +21,24 @@ urlpatterns = [
     # API publica de consulta externa (JSON)
     path('api/', include('api.urls')),
 
-    # Raiz -> index.html (login del frontend)
-    re_path(r'^$', serve, {'document_root': FRONTEND, 'path': 'index.html'}),
+    # ── Sitio web, con direcciones limpias (sin .html) ──────────────────────
+    # La raiz y el antiguo index.html llevan a /login.
+    re_path(r'^$', RedirectView.as_view(url='/login', permanent=False)),
+    re_path(r'^index\.html$', RedirectView.as_view(url='/login', permanent=False)),
 
-    # Resto de archivos del frontend (css/, js/, pages/, imagenes)
+    path('login', login_sitio, name='login_sitio'),
+    re_path(r'^login/$', RedirectView.as_view(url='/login', permanent=False)),
+
+    # Las direcciones .html de antes redirigen a la limpia equivalente,
+    # para que ningun enlace guardado se quede colgado.
+    re_path(
+        r'^pages/(?P<carpeta>[\w-]+)/(?P<pagina>[\w-]+)\.html$',
+        pagina_antigua,
+    ),
+
+    # /superadmin/dashboard, /profesor/curso, /estudiante/quiz ...
+    path('<slug:seccion>/<slug:pagina>', pagina_sitio, name='pagina_sitio'),
+
+    # Recursos del frontend (css/, js/, imagenes)
     re_path(r'^(?P<path>.*)$', serve, {'document_root': FRONTEND}),
 ]

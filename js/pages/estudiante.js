@@ -2,7 +2,7 @@
 function initEstudiantePage(titulo) {
   const usuario = Auth.getUsuarioActivo();
   if (!usuario || usuario.rol !== "USER" || sessionStorage.getItem("rol_activo") !== "ESTUDIANTE") {
-    window.location.href = BASE_PATH + "index.html";
+    window.location.href = LOGIN;
     return null;
   }
   Sidebar.inject(usuario, window.location.pathname);
@@ -108,7 +108,7 @@ const MisCursosEstudiante = {
           </div>
           <div class="course-card-footer">
             <span class="badge badge-${c.estado === "activo" ? "success" : "neutral"}">${c.estado === "activo" ? "Activo" : "Archivado"}</span>
-            <a href="curso.html?id=${c.id}" class="btn btn-primary btn-sm">
+            <a href="curso?id=${c.id}" class="btn btn-primary btn-sm">
               Ir al curso <i class="bi-arrow-right"></i>
             </a>
           </div>
@@ -125,8 +125,8 @@ const CursoEstudiante = {
     const id = parseInt(getParams().get("id"));
     let curso;
     try { curso = await API.cursoDetalle(id); }
-    catch { window.location.href = "mis-cursos.html"; return; }
-    if (!curso) { window.location.href = "mis-cursos.html"; return; }
+    catch { window.location.href = "mis-cursos"; return; }
+    if (!curso) { window.location.href = "mis-cursos"; return; }
 
     const prog = await API.progresoCurso(id).catch(() => ({ porcentaje: 0 }));
     const pct  = prog.porcentaje;
@@ -167,7 +167,7 @@ const CursoEstudiante = {
       const completado = !!m.completado;
       const mats = (m.materiales || []).length;
       return `
-        <a href="modulo.html?modulo_id=${m.id}&curso_id=${cursoId}" style="text-decoration:none">
+        <a href="modulo?modulo_id=${m.id}&curso_id=${cursoId}" style="text-decoration:none">
           <div class="module-item" style="cursor:pointer;transition:background .15s" onmouseover="this.style.background='#F9FAFB'" onmouseout="this.style.background=''">
             <div class="module-num" style="${completado ? "background:var(--color-success);color:#fff" : ""}">${completado ? '<i class="bi-check-lg"></i>' : m.orden}</div>
             <div class="module-info">
@@ -194,7 +194,7 @@ const CursoEstudiante = {
     el.innerHTML = pendientes.map(t => {
       const vencida = eVencida(t.fecha_limite);
       return `
-        <a href="tarea.html?tarea_id=${t.id}&curso_id=${cursoId}" style="text-decoration:none">
+        <a href="tarea?tarea_id=${t.id}&curso_id=${cursoId}" style="text-decoration:none">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--color-border);gap:12px">
             <div>
               <p class="fw-semibold text-sm" style="margin:0">${t.titulo}</p>
@@ -220,7 +220,7 @@ const CursoEstudiante = {
     el.innerHTML = pendientes.map(q => {
       const vencida = eVencida(q.fecha_limite);
       return `
-        <a href="quiz.html?quiz_id=${q.id}&curso_id=${cursoId}" style="text-decoration:none">
+        <a href="quiz?quiz_id=${q.id}&curso_id=${cursoId}" style="text-decoration:none">
           <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--color-border);gap:12px">
             <div>
               <p class="fw-semibold text-sm" style="margin:0">${q.titulo}</p>
@@ -246,9 +246,9 @@ const ModuloEstudiante = {
     const modulo_id = parseInt(getParams().get("modulo_id"));
     const curso_id  = parseInt(getParams().get("curso_id"));
     try { this._modulos = await API.modulos(curso_id); }
-    catch { window.location.href = `curso.html?id=${curso_id}`; return; }
+    catch { window.location.href = `curso?id=${curso_id}`; return; }
     const m = this._modulos.find(m => m.id === modulo_id);
-    if (!m) { window.location.href = `curso.html?id=${curso_id}`; return; }
+    if (!m) { window.location.href = `curso?id=${curso_id}`; return; }
 
     document.getElementById("modulo-titulo").textContent     = m.titulo;
     document.getElementById("modulo-descripcion").textContent= m.descripcion || "";
@@ -308,11 +308,11 @@ const ModuloEstudiante = {
     navEl.innerHTML = `
       <div style="display:flex;justify-content:space-between;gap:12px">
         ${prev
-          ? `<a href="modulo.html?modulo_id=${prev.id}&curso_id=${curso_id}" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> ${prev.titulo}</a>`
+          ? `<a href="modulo?modulo_id=${prev.id}&curso_id=${curso_id}" class="btn btn-ghost btn-sm"><i class="bi-arrow-left"></i> ${prev.titulo}</a>`
           : `<span></span>`}
         ${next
-          ? `<a href="modulo.html?modulo_id=${next.id}&curso_id=${curso_id}" class="btn btn-primary btn-sm">${next.titulo} <i class="bi-arrow-right"></i></a>`
-          : `<a href="curso.html?id=${curso_id}" class="btn btn-ghost btn-sm">Volver al curso <i class="bi-arrow-right"></i></a>`}
+          ? `<a href="modulo?modulo_id=${next.id}&curso_id=${curso_id}" class="btn btn-primary btn-sm">${next.titulo} <i class="bi-arrow-right"></i></a>`
+          : `<a href="curso?id=${curso_id}" class="btn btn-ghost btn-sm">Volver al curso <i class="bi-arrow-right"></i></a>`}
       </div>`;
   },
 
@@ -335,7 +335,7 @@ const TareaEstudiante = {
     const curso_id = parseInt(getParams().get("curso_id"));
     let tarea;
     try { tarea = await API.tareaDetalle(tarea_id); }
-    catch { window.location.href = `curso.html?id=${curso_id}`; return; }
+    catch { window.location.href = `curso?id=${curso_id}`; return; }
 
     document.getElementById("tarea-titulo").textContent     = tarea.titulo;
     document.getElementById("tarea-descripcion").innerHTML  = (tarea.descripcion || "").replace(/\n/g, "<br>");
@@ -398,7 +398,7 @@ const TareaEstudiante = {
     try {
       await API.entregar(tarea_id, payload);
       ENotif("Tarea entregada correctamente.");
-      setTimeout(() => { window.location.href = `curso.html?id=${curso_id}`; }, 1000);
+      setTimeout(() => { window.location.href = `curso?id=${curso_id}`; }, 1000);
     } catch (e) { ENotif(e.message, "danger"); }
   },
 
@@ -427,8 +427,8 @@ const QuizEstudiante = {
         API.quizDetalle(quiz_id),
         API.respuestasQuiz(quiz_id).catch(() => [])
       ]);
-    } catch { window.location.href = `curso.html?id=${curso_id}`; return; }
-    if (!quiz) { window.location.href = `curso.html?id=${curso_id}`; return; }
+    } catch { window.location.href = `curso?id=${curso_id}`; return; }
+    if (!quiz) { window.location.href = `curso?id=${curso_id}`; return; }
 
     this.quiz = quiz;
     const preguntas = quiz.preguntas || [];
@@ -817,7 +817,7 @@ const ProgresoEstudiante = {
         <div class="card" style="margin-bottom:20px">
           <div class="card-header">
             <h4 style="margin:0">${c.nombre}</h4>
-            <a href="curso.html?id=${c.id}" class="btn btn-ghost btn-sm">Ver curso <i class="bi-arrow-right"></i></a>
+            <a href="curso?id=${c.id}" class="btn btn-ghost btn-sm">Ver curso <i class="bi-arrow-right"></i></a>
           </div>
           <div class="card-body">
             <div style="margin-bottom:16px">

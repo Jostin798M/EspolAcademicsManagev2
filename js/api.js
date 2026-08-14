@@ -214,11 +214,39 @@ const API = {
         via: "sesion",
       });
 
-      return { usuario: r.datos.usuario, rol_activo: r.datos.rol_activo };
+      return this._conDatosLocales(r.datos);
     } catch (err) {
       if (err instanceof SinBackend) return this._loginDemo(correo, password);
       throw err;                       // credenciales rechazadas por el servidor
     }
+  },
+
+  /* Puente entre la cuenta real y los datos locales.
+
+     Quien inicia sesion es un usuario de MySQL, pero las pantallas de
+     profesor y estudiante siguen leyendo el almacen local, donde el mismo
+     correo tiene otro id. Si existe ahi, se usa SU id para que "Mis cursos",
+     el progreso y las entregas sigan encontrando lo suyo; los datos que se
+     muestran (nombre, correo, rol) son siempre los de la base.
+
+     Cuando las pantallas lean de /api/ esto sobra y se quita. */
+  _conDatosLocales(datos) {
+    const usuario = { ...datos.usuario };
+    const d = _db();
+    const local = d.usuarios.find(u => u.correo === usuario.correo);
+
+    if (!local) return { usuario, rol_activo: datos.rol_activo };
+
+    usuario.id = local.id;
+
+    let rol_activo = datos.rol_activo;
+    if (usuario.rol === "USER") {
+      const esProf = d.inscripciones.some(
+        i => i.usuario_id === local.id && i.rol_en_curso === "PROFESOR");
+      rol_activo = esProf ? "PROFESOR" : "ESTUDIANTE";
+    }
+
+    return { usuario, rol_activo };
   },
 
   /* Respaldo sin servidor: los usuarios de mockdata.js. Sirve para

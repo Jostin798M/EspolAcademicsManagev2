@@ -1,5 +1,8 @@
 /* Rutas relativas al root del proyecto (funciona con file:/// y con servidor) */
-const BASE_PATH = window.location.pathname.includes('/pages/') ? '../../' : '';
+/* Direccion de la pantalla de entrada. El sitio se navega con
+   direcciones limpias (/login, /superadmin/dashboard), servidas por
+   Django; ninguna termina en .html. */
+const LOGIN = '/login';
 
 const DB = {
 

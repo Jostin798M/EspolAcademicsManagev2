@@ -2,7 +2,7 @@
 function initPage(tituloPagina) {
   const usuario = Auth.getUsuarioActivo();
   if (!usuario || usuario.rol !== "SUPERADMIN") {
-    window.location.href = BASE_PATH + "index.html";
+    window.location.href = LOGIN;
     return null;
   }
   Sidebar.inject(usuario, window.location.pathname);
@@ -163,7 +163,7 @@ const Usuarios = {
         <td>${badgeEstado(u.estado)}</td>
         <td>
           <div class="table-actions">
-            <a href="usuario-detalle.html?id=${u.id}" class="btn btn-ghost btn-sm" title="Ver"><i class="bi-eye"></i></a>
+            <a href="usuario-detalle?id=${u.id}" class="btn btn-ghost btn-sm" title="Ver"><i class="bi-eye"></i></a>
             <button class="btn btn-ghost btn-sm" onclick="ModalUsuario.abrir(${u.id})" title="Editar"><i class="bi-pencil"></i></button>
             <button class="btn btn-ghost btn-sm" onclick="Usuarios.toggleEstado(${u.id})" title="Cambiar estado"><i class="bi-toggle-on"></i></button>
           </div>
@@ -198,7 +198,7 @@ const Usuarios = {
             <span class="mob-card-val">${u.estado_civil}</span>
           </div>
           <div class="mob-card-actions">
-            <a href="usuario-detalle.html?id=${u.id}" class="btn btn-ghost btn-sm"><i class="bi-eye"></i> Ver</a>
+            <a href="usuario-detalle?id=${u.id}" class="btn btn-ghost btn-sm"><i class="bi-eye"></i> Ver</a>
             <button class="btn btn-ghost btn-sm" onclick="ModalUsuario.abrir(${u.id})"><i class="bi-pencil"></i> Editar</button>
             <button class="btn btn-ghost btn-sm" onclick="Usuarios.toggleEstado(${u.id})"><i class="bi-toggle-on"></i></button>
           </div>

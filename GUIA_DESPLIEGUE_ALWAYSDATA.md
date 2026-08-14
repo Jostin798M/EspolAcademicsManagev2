@@ -7,7 +7,8 @@ Al terminar tendrás funcionando en `https://jostin.alwaysdata.net`:
 
 | Ruta | Qué es |
 |---|---|
-| `/` | Aplicación web para estudiantes, profesores y administradores |
+| `/` → `/login` | Pantalla de entrada de la aplicación web |
+| `/superadmin/…`, `/facultad/…`, `/profesor/…`, `/estudiante/…` | Pantallas del sitio según el rol (direcciones sin `.html`) |
 | `/panel/` | Panel CRUD del Taller 3 (vistas genéricas de Django) |
 | `/accounts/usuarios/` | CRUD de usuarios |
 | `/cursos/…` | CRUD de facultades, cursos, fórmula, inscripciones, módulos, materiales, progreso |
@@ -523,9 +524,17 @@ Con un único usuario y una única contraseña entras a:
 
 | | |
 |---|---|
-| `https://jostin.alwaysdata.net/` | el sitio (panel de superadmin, profesor o estudiante) |
+| `https://jostin.alwaysdata.net/login` | el sitio (panel de superadmin, profesor o estudiante) |
 | `/admin/` y `/panel/` | la administración de Django, ya identificado |
 | `/api/…` | la API, sin escribir ninguna clave |
+
+**El sitio se navega con direcciones limpias**, sin `.html` a la vista: la raíz
+lleva a `/login`, y de ahí a `/superadmin/dashboard`, `/profesor/curso?id=3`,
+`/estudiante/mis-cursos`… Las sirve Django desde `config/urls.py`, así que los
+archivos de `pages/` ya no se abren directamente: las direcciones antiguas
+(`/pages/superadmin/dashboard.html`) **redirigen** a la limpia equivalente
+conservando los parámetros. El rol de admin de facultad se publica como
+`/facultad/…` porque `/admin/` es el panel de Django.
 
 Por eso **el `desplegar.sh` solo crea un usuario**: el `createsuperuser` de
 Django nace con rol `SUPERADMIN`, así que esa misma cuenta es la del `index.html`.
@@ -871,7 +880,7 @@ API_ORIGENES=https://mi-otra-app.com,https://jostin.alwaysdata.net
 En tu computadora, con el entorno virtual activado y dentro de `backend/`:
 
 ```bash
-python manage.py test api        # 65 pruebas del módulo
+python manage.py test           # 76 pruebas (api + direcciones del sitio)
 python manage.py runserver       # luego abre http://127.0.0.1:8000/api/
 ```
 
@@ -946,6 +955,8 @@ python manage.py collectstatic --noinput
 | **`401` con `"motivo": "token_caducado"` o `"token_revocado"`** | El token venció (`API_TOKEN_DIAS`) o alguien lo revocó desde `/admin/` → *Tokens de API*. La aplicación tiene que volver a `POST /api/auth/login/`. |
 | **El token deja de servir de golpe** | A esa cuenta le quitaron el rol `SUPERADMIN` o la marcaron inactiva: el rol se comprueba en cada petición. Compruébalo en `/api/auth/verificar/` (`detalle`). |
 | **`429` al iniciar sesión** | Diez intentos fallidos con ese correo desde la misma IP. Espera `API_LOGIN_BLOQUEO_MIN` minutos. |
+| **Entras, ves el dashboard un segundo y vuelve al login** | El servidor está corriendo una versión del código anterior a la del `git pull`: responde un login sin el campo `id` y el guardián de la página te devuelve. Pasa siempre que se hace `git pull` **sin reiniciar el sitio**: los `.html` y `.js` se leen del disco en cada visita, pero el Python vive en memoria en el worker de uWSGI. Reinicia desde el panel (Web → Sitios → Reiniciar). |
+| **Una pantalla del sitio da `404`** | Comprueba la dirección: son sin `.html` y con la sección delante (`/superadmin/usuarios`, no `/usuarios` ni `/pages/superadmin/usuarios.html`). |
 | **`/api/` devuelve HTML en vez de JSON** | La ruta `path('api/', include('api.urls'))` quedó **después** del `re_path` que sirve el frontend en `config/urls.py`, o falta `'api'` en `INSTALLED_APPS`. |
 | **El navegador bloquea la llamada por CORS** | Tu dominio no está en `API_ORIGENES`. Ponlo en el `.env` (o déjalo en `*`) y reinicia. Ojo: para usar la **sesión** desde otro dominio hay que listarlo explícitamente — con `*` el navegador no envía cookies, y ahí solo funciona la clave. |
 

@@ -2,7 +2,7 @@
 function initProfesorPage(titulo) {
   const usuario = Auth.getUsuarioActivo();
   if (!usuario || usuario.rol !== "USER" || sessionStorage.getItem("rol_activo") !== "PROFESOR") {
-    window.location.href = BASE_PATH + "index.html";
+    window.location.href = LOGIN;
     return null;
   }
   Sidebar.inject(usuario, window.location.pathname);
@@ -95,7 +95,7 @@ const MisCursosProfesor = {
           </div>
           <div class="course-card-footer">
             ${badgeCurso(c.estado)}
-            <a href="curso.html?id=${c.id}" class="btn btn-primary btn-sm">
+            <a href="curso?id=${c.id}" class="btn btn-primary btn-sm">
               Gestionar <i class="bi-arrow-right"></i>
             </a>
           </div>
@@ -210,7 +210,7 @@ const CursoForm = {
         await API.crearCurso(payload);
         Notif("Curso creado exitosamente.");
       }
-      setTimeout(() => { window.location.href = "mis-cursos.html"; }, 900);
+      setTimeout(() => { window.location.href = "mis-cursos"; }, 900);
     } catch (e) { Notif(e.message, "danger"); }
   }
 };
@@ -226,8 +226,8 @@ const GestionCurso = {
     const id = parseInt(getParams().get("id"));
     try {
       this.curso = await API.cursoDetalle(id);
-    } catch { window.location.href = "mis-cursos.html"; return; }
-    if (!this.curso) { window.location.href = "mis-cursos.html"; return; }
+    } catch { window.location.href = "mis-cursos"; return; }
+    if (!this.curso) { window.location.href = "mis-cursos"; return; }
 
     document.getElementById("curso-nombre").textContent = this.curso.nombre;
     document.getElementById("curso-codigo").innerHTML   =
@@ -269,7 +269,7 @@ const GestionCurso = {
             <span>${mats} material${mats !== 1 ? "es" : ""}</span>
           </div>
           <div style="display:flex;gap:6px">
-            <a href="modulo-form.html?curso_id=${this.curso.id}&modulo_id=${m.id}" class="btn btn-ghost btn-sm">
+            <a href="modulo-form?curso_id=${this.curso.id}&modulo_id=${m.id}" class="btn btn-ghost btn-sm">
               <i class="bi-pencil"></i>
             </a>
           </div>
@@ -303,8 +303,8 @@ const GestionCurso = {
                   <td><span class="badge badge-${entregas === total && total > 0 ? "success" : "warning"}">${entregas}/${total}</span></td>
                   <td>
                     <div class="table-actions">
-                      <a href="tarea-entregas.html?tarea_id=${t.id}&curso_id=${this.curso.id}" class="btn btn-ghost btn-sm"><i class="bi-eye"></i></a>
-                      <a href="tarea-form.html?curso_id=${this.curso.id}&tarea_id=${t.id}" class="btn btn-ghost btn-sm"><i class="bi-pencil"></i></a>
+                      <a href="tarea-entregas?tarea_id=${t.id}&curso_id=${this.curso.id}" class="btn btn-ghost btn-sm"><i class="bi-eye"></i></a>
+                      <a href="tarea-form?curso_id=${this.curso.id}&tarea_id=${t.id}" class="btn btn-ghost btn-sm"><i class="bi-pencil"></i></a>
                     </div>
                   </td>
                 </tr>`;
@@ -336,8 +336,8 @@ const GestionCurso = {
                 <td class="text-sm">${formatFecha(q.fecha_limite)}</td>
                 <td>
                   <div class="table-actions">
-                    <a href="quiz-resultados.html?quiz_id=${q.id}&curso_id=${this.curso.id}" class="btn btn-ghost btn-sm"><i class="bi-bar-chart"></i></a>
-                    <a href="quiz-form.html?curso_id=${this.curso.id}&quiz_id=${q.id}" class="btn btn-ghost btn-sm"><i class="bi-pencil"></i></a>
+                    <a href="quiz-resultados?quiz_id=${q.id}&curso_id=${this.curso.id}" class="btn btn-ghost btn-sm"><i class="bi-bar-chart"></i></a>
+                    <a href="quiz-form?curso_id=${this.curso.id}&quiz_id=${q.id}" class="btn btn-ghost btn-sm"><i class="bi-pencil"></i></a>
                   </div>
                 </td>
               </tr>`).join("")}
@@ -554,7 +554,7 @@ const ModuloForm = {
         await API.crearModulo(curso_id, { titulo, descripcion, orden });
         Notif("Modulo creado.");
       }
-      setTimeout(() => { window.location.href = `curso.html?id=${curso_id}`; }, 800);
+      setTimeout(() => { window.location.href = `curso?id=${curso_id}`; }, 800);
     } catch (e) { Notif(e.message, "danger"); }
   },
 
@@ -620,7 +620,7 @@ const TareaForm = {
         await API.crearTarea(curso_id, payload);
         Notif("Tarea creada.");
       }
-      setTimeout(() => { window.location.href = `curso.html?id=${curso_id}`; }, 800);
+      setTimeout(() => { window.location.href = `curso?id=${curso_id}`; }, 800);
     } catch (e) { Notif(e.message, "danger"); }
   }
 };
@@ -1035,7 +1035,7 @@ const QuizForm = {
         await API.crearQuiz(curso_id, payload);
         Notif("Quiz creado.");
       }
-      setTimeout(() => { window.location.href = `curso.html?id=${curso_id}`; }, 800);
+      setTimeout(() => { window.location.href = `curso?id=${curso_id}`; }, 800);
     } catch (e) { Notif(e.message, "danger"); }
   }
 };
