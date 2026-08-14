@@ -1,11 +1,80 @@
-/* ── CAPA DE DATOS (localStorage) — sin backend ─────────────
-   Reemplaza por completo la API Django REST.
-   Todos los métodos retornan Promises para mantener
-   compatibilidad con el código async/await existente.
-   Los datos iniciales provienen de js/data/mockdata.js (DB).
+/* ── CAPA DE DATOS ──────────────────────────────────────────
+   El LOGIN va contra el backend real (endpoints /api/auth/…):
+   valida contra MySQL, abre la sesión de Django y así el mismo
+   usuario entra al sitio, a /admin/, a /panel/ y a la API.
+   Si el backend no responde (index.html abierto suelto, sin
+   Django), cae en modo demo con los usuarios de mockdata.js.
+
+   El RESTO de los datos sigue en localStorage, igual que antes.
+   Todos los métodos retornan Promises.
 ──────────────────────────────────────────────────────────── */
 
 const STORE_KEY = "espol_db";
+
+/* ── PUENTE CON EL BACKEND ───────────────────────────────── */
+/* Django sirve este frontend desde la raíz del dominio, así que
+   la API siempre cuelga de /api/ sea cual sea la página. */
+const API_URL = "/api";
+
+/* Error de red: el backend no está. Se distingue de un rechazo
+   de credenciales, que sí es una respuesta legítima del servidor. */
+class SinBackend extends Error {}
+
+const Backend = {
+  /* Con file:// no hay servidor al que preguntar. */
+  posible() {
+    return window.location.protocol === "http:" || window.location.protocol === "https:";
+  },
+
+  async post(ruta, cuerpo) {
+    if (!this.posible()) throw new SinBackend("Sin servidor.");
+
+    let respuesta;
+    try {
+      respuesta = await fetch(API_URL + ruta, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",   // la cookie de sesión de Django
+        body: JSON.stringify(cuerpo),
+      });
+    } catch {
+      throw new SinBackend("No se pudo contactar al servidor.");
+    }
+
+    let datos;
+    try {
+      datos = await respuesta.json();
+    } catch {
+      throw new SinBackend("El servidor no respondió en JSON.");
+    }
+
+    return datos;
+  },
+
+  async get(ruta) {
+    if (!this.posible()) throw new SinBackend("Sin servidor.");
+
+    try {
+      const respuesta = await fetch(API_URL + ruta, { credentials: "same-origin" });
+      return await respuesta.json();
+    } catch {
+      throw new SinBackend("No se pudo contactar al servidor.");
+    }
+  },
+};
+
+/* Qué sabe la sesión actual sobre la API (lo pinta el dashboard). */
+const Sesion = {
+  guardar({ modo, autorizado, mensaje, via }) {
+    sessionStorage.setItem("modo", modo);
+    sessionStorage.setItem("api_autorizado", autorizado ? "1" : "0");
+    sessionStorage.setItem("api_mensaje", mensaje || "");
+    sessionStorage.setItem("api_via", via || "");
+  },
+  modo()       { return sessionStorage.getItem("modo") || "demo"; },
+  autorizado() { return sessionStorage.getItem("api_autorizado") === "1"; },
+  mensaje()    { return sessionStorage.getItem("api_mensaje") || ""; },
+};
 
 /* ── Persistencia ────────────────────────────────────────── */
 function _load() {
@@ -124,7 +193,37 @@ const API = {
   _err: m => Promise.reject(new Error(m)),
 
   /* AUTH ────────────────────────────────────────────────── */
-  login(correo, password) {
+
+  /* Login unificado. Un solo formulario y una sola contraseña:
+     el backend valida contra MySQL y abre la sesión de Django,
+     que es la misma que reconocen /admin/, /panel/ y /api/.
+     No se pide token: al navegador le basta la cookie, y así
+     ningún token queda guardado en el equipo del usuario. */
+  async login(correo, password) {
+    try {
+      const r = await Backend.post("/auth/login/", {
+        correo, password, sesion: true, token: false,
+      });
+
+      if (!r.ok) throw new Error(r.error || "No se pudo iniciar sesion.");
+
+      Sesion.guardar({
+        modo: "backend",
+        autorizado: r.datos.autorizado,
+        mensaje: r.datos.aviso || "",
+        via: "sesion",
+      });
+
+      return { usuario: r.datos.usuario, rol_activo: r.datos.rol_activo };
+    } catch (err) {
+      if (err instanceof SinBackend) return this._loginDemo(correo, password);
+      throw err;                       // credenciales rechazadas por el servidor
+    }
+  },
+
+  /* Respaldo sin servidor: los usuarios de mockdata.js. Sirve para
+     enseñar el frontend abriendo index.html directamente. */
+  _loginDemo(correo, password) {
     const d = _db();
     const u = d.usuarios.find(u => u.correo === correo && u.password === password);
     if (!u) return this._err("Correo o contrasena incorrectos.");
@@ -134,9 +233,31 @@ const API = {
       const esProf = d.inscripciones.some(i => i.usuario_id === u.id && i.rol_en_curso === "PROFESOR");
       rol_activo = esProf ? "PROFESOR" : "ESTUDIANTE";
     }
+    Sesion.guardar({ modo: "demo", autorizado: false, mensaje: "", via: "" });
     return this._ok({ usuario: _enrichUser(u), rol_activo });
   },
-  logout() { return this._ok(null); },
+
+  /* Cierra las dos puntas: la sesión de Django y la del navegador. */
+  async logout() {
+    try { await Backend.post("/auth/logout/", {}); } catch { /* modo demo */ }
+    return null;
+  },
+
+  /* ¿Sigue siendo super administrador para la API? Lo consulta el
+     dashboard; devuelve null si no hay backend al que preguntar. */
+  async verificarApi() {
+    try {
+      const r = await Backend.get("/auth/verificar/");
+      return {
+        autorizado: !!r.ok && !!r.datos && r.datos.autorizado === true,
+        mensaje: r.ok ? (r.datos.mensaje || "") : (r.error || ""),
+        via: r.ok ? r.datos.via : null,
+        usuario: r.ok ? r.datos.usuario : null,
+      };
+    } catch {
+      return null;
+    }
+  },
   me() {
     const d = _db();
     const u = d.usuarios.find(u => u.id === _uid());

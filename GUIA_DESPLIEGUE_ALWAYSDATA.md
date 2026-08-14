@@ -514,6 +514,41 @@ navegador ves la lista de recursos y **si tu sesión actual está autorizada**:
 "acceso_actual": { "autorizado": true, "via": "sesion", "usuario": "tu@espol.edu.ec" }
 ```
 
+#### Un solo login para todo
+
+La pantalla de `index.html` **ya no valida contra los datos de prueba del
+navegador**: llama a `POST /api/auth/login/` con `"sesion": true`, que comprueba
+el correo y la contraseña contra MySQL y abre la **cookie de sesión de Django**.
+Con un único usuario y una única contraseña entras a:
+
+| | |
+|---|---|
+| `https://jostin.alwaysdata.net/` | el sitio (panel de superadmin, profesor o estudiante) |
+| `/admin/` y `/panel/` | la administración de Django, ya identificado |
+| `/api/…` | la API, sin escribir ninguna clave |
+
+Por eso **el `desplegar.sh` solo crea un usuario**: el `createsuperuser` de
+Django nace con rol `SUPERADMIN`, así que esa misma cuenta es la del `index.html`.
+No hay que darla de alta dos veces.
+
+En el **dashboard del superadmin** hay una tarjeta con el estado de la sesión y
+dos botones directos: **Panel de Django** (`/admin/`) y **Lista de endpoints de
+la API** (`/api/`).
+
+Detalles que conviene saber:
+
+- Quien **no** es superadmin (profesor, estudiante, admin de facultad) entra
+  igual a su panel; simplemente la respuesta trae `"autorizado": false` y el
+  aviso, y la API le sigue respondiendo `401`.
+- El sitio pide `"token": false`: le basta la cookie, así que **no se guarda
+  ningún token en el navegador** ni se crea una fila por cada vez que alguien
+  entra. Los tokens son solo para aplicaciones de terceros.
+- El botón **Salir** llama a `POST /api/auth/logout/`, que cierra la sesión de
+  Django además de la del navegador.
+- Si abres `index.html` **suelto** (con `file://`, sin Django levantado), el
+  login cae en el modo demo de siempre con los usuarios de `mockdata.js`, y el
+  dashboard lo avisa con una etiqueta *Modo demo*.
+
 #### Desde el navegador (lo más cómodo)
 
 1. Entra a `https://jostin.alwaysdata.net/admin/` con tu superusuario.
@@ -673,9 +708,9 @@ instante, sin esperar a que caduquen.
 |---|---|
 | `GET /api/` | Índice: lista todos los recursos, filtros y opciones de paginación |
 | `GET /api/estado/` | Salud del servicio: versión, conexión a la base y totales |
-| `POST /api/auth/login/` | Cambia correo + contraseña de un SUPERADMIN por un token |
+| `POST /api/auth/login/` | Cambia correo + contraseña de un SUPERADMIN por un token. Con `"sesion": true` es además el login del sitio |
 | `GET /api/auth/verificar/` | ¿Quien pregunta está identificado como super administrador? |
-| `POST /api/auth/logout/` | Revoca el token con el que se llama |
+| `POST /api/auth/logout/` | Revoca el token con el que se llama y cierra la sesión de Django |
 | `GET /api/facultades/` | Listado de facultades con su número de cursos |
 | `GET /api/facultades/<código>/` | Una facultad y sus cursos (ej. `FIEC`) |
 | `GET /api/cursos/` | Catálogo de cursos (paginado) |
@@ -836,7 +871,7 @@ API_ORIGENES=https://mi-otra-app.com,https://jostin.alwaysdata.net
 En tu computadora, con el entorno virtual activado y dentro de `backend/`:
 
 ```bash
-python manage.py test api        # 57 pruebas del módulo
+python manage.py test api        # 65 pruebas del módulo
 python manage.py runserver       # luego abre http://127.0.0.1:8000/api/
 ```
 

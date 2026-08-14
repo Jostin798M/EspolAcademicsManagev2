@@ -26,10 +26,55 @@ function formatFecha(f) {
   return new Date(f).toLocaleDateString("es-EC",{day:"2-digit",month:"short",year:"numeric"});
 }
 
+/* ── ACCESOS AL BACKEND ──────────────────────────────────── */
+/* Pinta la tarjeta con los dos botones del dashboard y dice si la
+   sesion actual sirve para la API. Pregunta a /api/auth/verificar/,
+   que es la misma respuesta que veria cualquier otra aplicacion. */
+const Accesos = {
+  async pintar() {
+    const estado  = document.getElementById("estado-api");
+    const detalle = document.getElementById("detalle-api");
+    const botones = [document.getElementById("btn-django"),
+                     document.getElementById("btn-api")];
+    if (!estado || !detalle) return;
+
+    const api = await API.verificarApi();
+
+    if (!api) {
+      // Sin servidor: index.html abierto suelto, datos locales.
+      estado.className = "badge badge-warning";
+      estado.textContent = "Modo demo";
+      detalle.textContent =
+        "Estas viendo los datos locales de prueba: no hay backend al que " +
+        "preguntar. Levanta Django (manage.py runserver) y entra por el " +
+        "sitio para usar el panel y la API reales.";
+      botones.forEach(b => b && b.classList.add("disabled"));
+      return;
+    }
+
+    if (api.autorizado) {
+      estado.className = "badge badge-success";
+      estado.textContent = "Sesion de Django activa";
+      detalle.innerHTML =
+        `Estas identificado como <strong>${api.usuario.correo}</strong> ` +
+        `(${api.usuario.rol}). Con esta misma sesion entras al panel de ` +
+        `administracion y consultas la API sin escribir ninguna clave.`;
+      return;
+    }
+
+    // La sesion existe en el navegador pero el backend no la autoriza.
+    estado.className = "badge badge-danger";
+    estado.textContent = "Sin acceso a la API";
+    detalle.textContent = api.mensaje || "No se ha autorizado que sea un super admin.";
+    botones.forEach(b => b && b.classList.add("disabled"));
+  },
+};
+
 /* ── DASHBOARD ───────────────────────────────────────────── */
 const Dashboard = {
   async init() {
     if (!initPage("Dashboard")) return;
+    Accesos.pintar();
     try {
       const [usuarios, cursos, facultades] = await Promise.all([
         API.usuarios(), API.cursos(), API.facultades()

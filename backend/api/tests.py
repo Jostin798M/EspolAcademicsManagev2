@@ -431,6 +431,77 @@ class ApiAutenticacionTest(ApiBaseTest):
 
         self.assertEqual(self.cuerpo(respuesta)['intentos_restantes'], 9)
 
+    # ── Login del sitio (index.html): "sesion": true ─────────────────────
+
+    def test_login_con_sesion_abre_la_cookie_de_django(self):
+        cuerpo = self.cuerpo(self.login(sesion=True))
+
+        self.assertTrue(cuerpo['datos']['autorizado'])
+        self.assertTrue(cuerpo['datos']['sesion_django'])
+        self.assertTrue(cuerpo['datos']['token'])
+
+        # Sin mandar el token: entra por la cookie que acaba de abrirse.
+        self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 200)
+
+    def test_el_sitio_deja_entrar_a_quien_no_es_superadmin_pero_sin_api(self):
+        respuesta = self.login(correo='alumno@espol.edu.ec', sesion=True)
+        datos = self.cuerpo(respuesta)['datos']
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertFalse(datos['autorizado'])
+        self.assertIsNone(datos['token'])
+        self.assertEqual(datos['aviso'], 'No se ha autorizado que sea un super admin.')
+        self.assertEqual(datos['usuario']['rol'], 'USER')
+
+        # La cookie existe, pero la API sigue cerrada para ese rol.
+        self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 401)
+
+    def test_el_login_dice_con_que_rol_entra_un_usuario(self):
+        alumno = self.cuerpo(self.login(correo='alumno@espol.edu.ec', sesion=True))
+
+        self.assertEqual(alumno['datos']['rol_activo'], 'ESTUDIANTE')
+
+        Inscripcion.objects.create(
+            usuario=self.profesor,
+            curso=self.curso,
+            rol_en_curso=Inscripcion.RolEnCurso.PROFESOR,
+        )
+        docente = self.cuerpo(self.login(correo='profe@espol.edu.ec', sesion=True))
+
+        self.assertEqual(docente['datos']['rol_activo'], 'PROFESOR')
+        self.assertIsNone(self.cuerpo(self.login(sesion=True))['datos']['rol_activo'])
+
+    def test_el_sitio_entra_sin_que_se_emita_ningun_token(self):
+        datos = self.cuerpo(self.login(sesion=True, token=False))['datos']
+
+        self.assertTrue(datos['autorizado'])
+        self.assertIsNone(datos['token'])
+        self.assertEqual(TokenApi.objects.count(), 0)
+
+        # La cookie de sesion le abre la API igual.
+        self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 200)
+
+    def test_la_ficha_del_usuario_trae_lo_que_pinta_el_frontend(self):
+        usuario = self.cuerpo(self.login(sesion=True))['datos']['usuario']
+
+        self.assertEqual(usuario['id'], self.superadmin.id_usuario)
+        self.assertEqual(usuario['iniciales'], 'SM')
+        self.assertEqual(usuario['nombre_completo'], 'Sofia Mora')
+
+    def test_una_cuenta_inactiva_no_entra_ni_al_sitio(self):
+        self.estudiante.estado = Usuario.Estado.INACTIVO
+        self.estudiante.save(update_fields=['estado'])
+
+        respuesta = self.login(correo='alumno@espol.edu.ec', sesion=True)
+
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(self.cuerpo(respuesta)['motivo'], 'cuenta_inactiva')
+
+    def test_sin_pedir_sesion_el_no_superadmin_sigue_recibiendo_403(self):
+        respuesta = self.login(correo='alumno@espol.edu.ec')
+
+        self.assertEqual(respuesta.status_code, 403)
+
     # ── Uso del token ────────────────────────────────────────────────────
 
     def test_el_token_abre_la_api_completa(self):
@@ -559,13 +630,19 @@ class ApiAutenticacionTest(ApiBaseTest):
         self.assertEqual(cuerpo['datos']['revocados'], 2)
         self.assertEqual(TokenApi.objects.filter(revocado=False).count(), 0)
 
-    def test_logout_sin_token_explica_que_falta(self):
-        self.client.force_login(self.superadmin)
-
+    def test_logout_sin_nada_que_cerrar_avisa(self):
         respuesta = self.client.post(reverse('api:auth_logout'))
 
         self.assertEqual(respuesta.status_code, 400)
         self.assertEqual(self.cuerpo(respuesta)['motivo'], 'sin_token')
+
+    def test_logout_cierra_tambien_la_sesion_de_django(self):
+        self.client.force_login(self.superadmin)
+
+        cuerpo = self.cuerpo(self.client.post(reverse('api:auth_logout')))
+
+        self.assertTrue(cuerpo['datos']['sesion_cerrada'])
+        self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 401)
 
     # ── Descubrimiento ───────────────────────────────────────────────────
 

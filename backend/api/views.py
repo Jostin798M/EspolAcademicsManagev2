@@ -9,7 +9,8 @@ Todas devuelven JSON con la forma:
 La autenticacion es por clave: encabezado X-API-Key o parametro ?clave=.
 """
 from django.conf import settings
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, login as abrir_sesion
+from django.contrib.auth import logout as cerrar_sesion
 from django.db import connection
 from django.db.models import Count, Prefetch, Q
 from django.shortcuts import get_object_or_404
@@ -354,16 +355,60 @@ def curso_estudiantes(request, codigo):
 # (verificar) y lo devuelve cuando su usuario cierra sesion (logout).
 
 def _usuario_publico(usuario):
-    """Ficha del usuario que se devuelve a la aplicacion que pregunta."""
+    """
+    Ficha del usuario que se devuelve a quien inicia sesion.
+
+    Lleva los mismos nombres de campo que usa el frontend (id, iniciales,
+    nombre_completo) para que index.html pueda guardarla tal cual.
+    """
     return {
         'id_usuario': usuario.id_usuario,
+        'id': usuario.id_usuario,
+        'nombres': usuario.nombres,
+        'apellidos': usuario.apellidos,
         'nombre_completo': usuario.nombre_completo,
+        'iniciales': usuario.iniciales,
         'correo': usuario.correo,
         'rol': usuario.rol,
         'estado': usuario.estado,
         'es_superadmin': seguridad.es_usuario_autorizado(usuario),
         'facultad': usuario.facultad.codigo if usuario.facultad_id else None,
     }
+
+
+def _rol_activo(usuario):
+    """
+    Con que sombrero entra al sitio quien tiene rol USER.
+
+    El frontend necesita saber si a un USER le toca el panel de profesor o
+    el de estudiante; se decide por sus inscripciones, igual que antes lo
+    hacia js/api.js con los datos locales.
+    """
+    if usuario.rol != Usuario.Rol.USER:
+        return None
+
+    es_profesor = Inscripcion.objects.filter(
+        usuario=usuario,
+        rol_en_curso=Inscripcion.RolEnCurso.PROFESOR,
+    ).exists()
+
+    return 'PROFESOR' if es_profesor else 'ESTUDIANTE'
+
+
+def _quiere_sesion(datos):
+    """El que llama pide ademas la cookie de sesion (lo hace index.html)."""
+    return str(datos.get('sesion', '')).strip().lower() in ('1', 'true', 'si', 'yes')
+
+
+def _quiere_token(datos):
+    """
+    Si hay que emitir token. Por defecto si.
+
+    El sitio web manda "token": false: le basta la cookie de sesion, y asi
+    no se guarda ningun token en el navegador ni se llena la tabla con uno
+    por cada vez que alguien entra.
+    """
+    return str(datos.get('token', True)).strip().lower() not in ('0', 'false', 'no')
 
 
 def _dias_solicitados(datos):
@@ -392,15 +437,24 @@ def auth_login(request):
     """
     Entrega un token a una aplicacion externa.
 
+    Es tambien el login del sitio: la pantalla de index.html llama aqui.
+
     Cuerpo (JSON o formulario):
 
         {"correo": "jefe@espol.edu.ec", "password": "...",
-         "aplicacion": "Mi App", "dias": 30}
+         "aplicacion": "Mi App", "dias": 30, "sesion": false, "token": true}
 
-    Solo lo consigue quien se identifica con una cuenta que sea SUPERADMIN
-    en ESTA base de datos. Con cualquier otra cuenta la respuesta es 403 con
-    el mensaje "No se ha autorizado que sea un super admin.", para que la
-    aplicacion que llama pueda mostrarselo a su usuario tal cual.
+    Hay dos maneras de llamarlo, segun quien sea:
+
+    · Otra aplicacion (sin "sesion"): recibe el token si la cuenta es
+      SUPERADMIN en ESTA base de datos, y un 403 con el mensaje "No se ha
+      autorizado que sea un super admin." si no lo es.
+
+    · El sitio web ("sesion": true): entra cualquier usuario valido, porque
+      es el login de la aplicacion. Se abre la cookie de sesion de Django
+      (la misma de /admin/ y /panel/) y, si ademas es super administrador,
+      la respuesta trae el token de la API. Si no lo es, entra igual a su
+      panel pero con "autorizado": false y el aviso.
 
     El texto del token se muestra UNA sola vez: guardalo al recibirlo.
     """
@@ -437,8 +491,10 @@ def auth_login(request):
         )
 
     seguridad.olvidar_intentos(request, correo)
+    quiere_sesion = _quiere_sesion(datos)
 
     if not seguridad.cuenta_activa(usuario):
+        # Una cuenta inactiva no entra a ningun sitio, ni al sitio web.
         return error(
             seguridad.NO_AUTORIZADO,
             403,
@@ -448,8 +504,11 @@ def auth_login(request):
             usuario=_usuario_publico(usuario),
         )
 
-    if not seguridad.es_usuario_autorizado(usuario):
-        # Credenciales correctas, pero la cuenta no es de super admin.
+    autorizado = seguridad.es_usuario_autorizado(usuario)
+
+    if not autorizado and not quiere_sesion:
+        # Una aplicacion externa pidiendo token con una cuenta que no es de
+        # super admin: no hay nada que entregarle.
         return error(
             seguridad.NO_AUTORIZADO,
             403,
@@ -461,6 +520,43 @@ def auth_login(request):
             usuario=_usuario_publico(usuario),
         )
 
+    if quiere_sesion:
+        # Login del sitio (index.html): deja la cookie de sesion, la misma
+        # que reconocen /admin/, /panel/ y la propia API. Con un solo login
+        # el super administrador queda dentro de todo.
+        abrir_sesion(request, usuario)
+
+    respuesta = {
+        'autorizado': autorizado,
+        'usuario': _usuario_publico(usuario),
+        'rol_activo': _rol_activo(usuario),
+        'sesion_django': quiere_sesion,
+        'acceso': 'completo' if autorizado else 'sin_api',
+        'token': None,
+    }
+
+    if not autorizado:
+        # Entra al sitio con su rol, pero la API no se le abre.
+        respuesta['aviso'] = seguridad.NO_AUTORIZADO
+        respuesta['motivo'] = seguridad.NO_SUPERADMIN
+        respuesta['detalle'] = (
+            f'La cuenta {usuario.correo} tiene rol {usuario.rol}; '
+            f'la API solo la usan los roles '
+            f'{", ".join(seguridad.roles_permitidos())}.'
+        )
+
+        return ok(respuesta)
+
+    if not _quiere_token(datos):
+        # Login del sitio: la cookie ya basta, no se emite ningun token.
+        respuesta['como_usarlo'] = {
+            'sesion': 'Ya puedes consultar la API en esta misma ventana; '
+                      'la cookie de sesion viaja sola.',
+            'indice': _url(request, 'indice'),
+        }
+
+        return ok(respuesta)
+
     token, plano = TokenApi.objects.crear(
         usuario,
         aplicacion=texto(datos, 'aplicacion', 'app', 'cliente'),
@@ -468,14 +564,11 @@ def auth_login(request):
         ip=seguridad.ip_de(request) or None,
     )
 
-    return ok({
-        'autorizado': True,
+    respuesta.update({
         'token': plano,
         'tipo': 'Bearer',
         'expira': token.expira.isoformat() if token.expira else None,
         'creado': token.creado.isoformat(),
-        'usuario': _usuario_publico(usuario),
-        'acceso': 'completo',
         'como_usarlo': {
             'encabezado': 'Authorization: Bearer ' + plano,
             'alternativa': 'X-API-Token: ' + plano,
@@ -485,6 +578,8 @@ def auth_login(request):
                      'servidor de tu aplicacion, nunca en el navegador.',
         },
     })
+
+    return ok(respuesta)
 
 
 @endpoint(abierto=True)
@@ -524,38 +619,52 @@ def auth_verificar(request):
     return ok(datos)
 
 
-@endpoint(metodos=('POST',))
+@endpoint(abierto=True, metodos=('POST',))
 def auth_logout(request):
     """
-    Revoca el token con el que se llama (cierre de sesion de la aplicacion).
+    Cierra la sesion: revoca el token y/o cierra la cookie de Django.
 
-    Con {"todos": true} revoca todos los tokens de esa cuenta, util cuando
-    se sospecha que uno se filtro.
+    Es el reverso de /api/auth/login/, y sirve para los dos casos:
+
+    · Con "Authorization: Bearer <token>" revoca ese token. Con
+      {"todos": true} revoca todos los de esa cuenta, util cuando se
+      sospecha que uno se filtro.
+    · Desde el sitio web cierra ademas la sesion de Django, de modo que un
+      solo boton de "Salir" deja fuera del sitio, de /admin/ y de la API.
     """
     acceso = request.acceso
+    datos = cuerpo_json(request)
+    todos = str(datos.get('todos', '')).strip().lower() in ('1', 'true', 'si', 'yes')
 
-    if not acceso.token:
+    revocados = 0
+    token = acceso.token if acceso else None
+
+    if token:
+        if todos:
+            revocados = TokenApi.objects.filter(
+                usuario=token.usuario, revocado=False,
+            ).update(revocado=True)
+        else:
+            token.revocar()
+            revocados = 1
+
+    tenia_sesion = getattr(request.user, 'is_authenticated', False)
+
+    if tenia_sesion:
+        cerrar_sesion(request)
+
+    if not token and not tenia_sesion:
         raise ErrorApi(
-            'Esta ruta revoca el token del encabezado Authorization y no se '
-            'ha recibido ninguno.',
+            'No hay nada que cerrar: no se recibio ningun token ni hay '
+            'sesion iniciada.',
             400,
             motivo='sin_token',
         )
 
-    datos = cuerpo_json(request)
-    todos = str(datos.get('todos', '')).strip().lower() in ('1', 'true', 'si', 'yes')
-
-    if todos:
-        revocados = TokenApi.objects.filter(
-            usuario=acceso.token.usuario, revocado=False,
-        ).update(revocado=True)
-    else:
-        acceso.token.revocar()
-        revocados = 1
-
     return ok({
         'revocados': revocados,
-        'mensaje': 'Token revocado. Vuelve a /api/auth/login/ para obtener otro.',
+        'sesion_cerrada': tenia_sesion,
+        'mensaje': 'Sesion cerrada. Vuelve a /api/auth/login/ para entrar.',
     })
 
 

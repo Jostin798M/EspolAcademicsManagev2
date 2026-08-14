@@ -406,8 +406,49 @@ paso "8/8  Creando tu usuario administrador"
 printf '\n'
 nota "Te pedira: correo, nombres, apellidos, identificacion, celular y contrasena."
 nota "El correo es el usuario de acceso (este proyecto no usa 'username')."
+nota "Esta cuenta UNICA sirve para las tres puertas, porque el login del"
+nota "sitio valida contra esta misma base de datos:"
+nota "  · el sitio  (https://$DOMINIO/)          <- la pantalla de index.html"
+nota "  · /admin/ y /panel/ de Django"
+nota "  · la API    (https://$DOMINIO/api/)"
 printf '\n'
 "$PY" manage.py createsuperuser
+
+# Comprobar que la cuenta recien creada entra por las tres puertas. El rol
+# SUPERADMIN es lo que mira el login del sitio y lo que abre la API; si el
+# createsuperuser se cancelo, aqui se ve enseguida.
+printf '\n'
+if "$PY" - <<'PYEOF'
+import os
+import sys
+
+import django
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
+
+from django.contrib.auth import get_user_model
+
+Usuario = get_user_model()
+
+cuentas = Usuario.objects.filter(
+    is_superuser=True, is_active=True, rol='SUPERADMIN',
+).order_by('-id_usuario')
+
+if not cuentas.exists():
+    print('   ! No hay ninguna cuenta de super administrador activa.')
+    sys.exit(1)
+
+print('   Cuentas que entran al sitio, a /admin/ y a la API:')
+for cuenta in cuentas:
+    print(f'      · {cuenta.correo}  ({cuenta.nombre_completo})')
+PYEOF
+then
+    ok "Super administrador listo para el sitio, /admin/ y la API"
+else
+    aviso "No se creo ningun super administrador. Vuelve a ejecutar:"
+    aviso "  cd $BACKEND && $PY manage.py createsuperuser"
+fi
 
 # ── resumen ──────────────────────────────────────────────────────────────────
 printf '\n%s' "$VERDE"
@@ -437,15 +478,35 @@ Guarda, pulsa Reiniciar, y abre:
   https://$DOMINIO/admin/
   https://$DOMINIO/api/          <-- indice de la API (JSON)
 
+Un solo usuario para todo
+
+  El login de https://$DOMINIO/ (la pantalla de index.html) valida contra
+  esta base de datos y abre la sesion de Django. Con el mismo correo y la
+  misma contrasena entras al sitio, a /admin/, a /panel/ y a la API: no hay
+  que crear una cuenta aparte para el index. En el dashboard del super
+  administrador tienes los dos botones directos al panel de Django y al
+  indice de la API.
+
 API de consulta (/api/)
 
-  Desde el navegador, sin claves: inicia sesion en https://$DOMINIO/admin/
-  con tu usuario SUPERADMIN y abre https://$DOMINIO/api/cursos/
+  Desde el navegador, sin claves: entra por https://$DOMINIO/ (o por
+  /admin/) con tu usuario SUPERADMIN y abre https://$DOMINIO/api/cursos/
 
-  Desde un programa externo (no tiene sesion), con la clave:
+  Desde otra aplicacion, que tiene su propio login: cambia el correo y la
+  contrasena de un SUPERADMIN por un token y consulta con el.
+
+    curl -X POST -H "Content-Type: application/json" \\
+      -d '{"correo":"TU_CORREO","password":"TU_CONTRASENA"}' \\
+      https://$DOMINIO/api/auth/login/
+
+    curl -H "Authorization: Bearer TU_TOKEN" https://$DOMINIO/api/cursos/
+
+  Si esa cuenta no es super administrador, la respuesta es siempre la misma:
+  "No se ha autorizado que sea un super admin."
+
+  Con una clave fija del sitio, para tus propios scripts:
 
     curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/estado/
-    curl -H "X-API-Key: $CLAVE_API" https://$DOMINIO/api/cursos/
 
   Clave (X-API-Key) ........ $CLAVE_API
   Guardala: esta tambien en $BACKEND/.env. Si solo la vas a consultar

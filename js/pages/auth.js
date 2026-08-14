@@ -52,7 +52,10 @@ const Auth = {
     window.location.href = rutas[usuario.rol] || BASE_PATH + "index.html";
   },
 
-  logout() {
+  /* Un solo "Salir": cierra la sesion de Django (y con ella el acceso
+     a /admin/, /panel/ y la API) ademas de la del navegador. */
+  async logout() {
+    try { await API.logout(); } catch { /* en modo demo no hay servidor */ }
     sessionStorage.clear();
     window.location.href = BASE_PATH + "index.html";
   },
