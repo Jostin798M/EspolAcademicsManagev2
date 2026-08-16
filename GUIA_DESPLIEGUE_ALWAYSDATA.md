@@ -459,51 +459,79 @@ Python) puedan consultarlos desde fuera del servidor.
 
 Características:
 
-- **Solo lectura.** Los datos únicamente se consultan con `GET`; ninguna ruta
-  de la API modifica el contenido académico de la base. Las dos únicas rutas
-  `POST` son las de identificarse (`/api/auth/login/` y `/api/auth/logout/`).
+- **Lee y escribe.** Se consulta con `GET` y se modifica con `POST` (crear),
+  `PATCH` (editar) y `DELETE` (eliminar). El sitio web y la app móvil usan
+  esta misma API, así que **lo que se cambia en una se ve en la otra**: es la
+  misma base de datos.
 - **Sin dependencias nuevas.** Está hecha con Django puro (`JsonResponse`), no
   con Django REST Framework, para no consumir la cuota de 100 MB de la cuenta.
 - **CORS habilitado**, así que se puede llamar desde el navegador de otro sitio.
-- **Tres formas de entrar**, y basta con una: tu **sesión de super
-  administrador** (nada que escribir), un **token** que otra aplicación pide
-  con las credenciales de un super administrador, o una **clave** fija del
-  sitio para tus propios scripts.
-- **Pensada para que la consuman otras apps.** La aplicación de un tercero, con
-  su propio sistema de login, cambia el correo y la contraseña de su usuario por
-  un token; si esa cuenta es **SUPERADMIN** en esta base de datos obtiene acceso
-  completo, y si no, recibe siempre el mismo aviso:
-  `No se ha autorizado que sea un super admin.`
+- **Tres formas de entrar**, y basta con una: tu **sesión** del navegador, un
+  **token** que otra aplicación pide con las credenciales de su usuario, o una
+  **clave** fija del sitio para tus propios scripts.
+- **Entra cualquier cuenta activa**, con el rol que tenga. Lo que cambia de un
+  rol a otro no es si puede entrar, sino **qué puede ver y qué puede tocar**.
+
+### Quién puede qué: los cuatro roles
+
+Esto lo decide `backend/api/permisos.py`, que es una tabla explícita de
+`rol → recurso → acciones`, y un **alcance** que dice sobre qué datos vale
+cada permiso:
+
+| Rol | Alcance | Puede |
+|---|---|---|
+| **SUPERADMIN** | todo el sistema | ver, crear, editar y eliminar cualquier cosa |
+| **ADMIN** (facultad) | su facultad | cursos, contenido, personas e inscripciones de su facultad. No crea super administradores ni elimina cuentas |
+| **PROFESOR** | los cursos que dicta | módulos, materiales, tareas, quizzes y notas de esos cursos. No crea ni elimina cursos |
+| **ESTUDIANTE** | los cursos que cursa | ve el contenido, entrega tareas, rinde quizzes y marca su avance. Edita su ficha, no su rol |
+
+Un detalle importante del modelo: **profesor y estudiante son los dos `USER`**
+en la tabla `usuario`. Lo que los distingue son sus inscripciones, y esa
+traducción la hace el servidor (`permisos.rol_efectivo`), no la aplicación que
+llama.
+
+Dos personas pueden pedir `GET /api/cursos/` y recibir listas distintas. Eso
+no es un error: es el alcance haciendo su trabajo.
+
+Puedes cerrarle la puerta a un rol entero desde el `.env`:
+`API_ROLES=SUPERADMIN,ADMIN` deja la API solo para administración. Por defecto
+entran los cuatro. Un superusuario de Django entra siempre.
 
 ### Cómo se autentica
 
-El módulo `backend/api/seguridad.py` decide quién entra. Hay tres vías y basta
-con cumplir una:
+El módulo `backend/api/seguridad.py` decide **quién eres**; `permisos.py`,
+**qué puedes**. Hay tres vías de entrada y basta con cumplir una:
 
 | Vía | Para qué sirve | Cómo |
 |---|---|---|
-| **Sesión** | Mirar la API tú, desde el navegador | Inicia sesión en `/admin/` con un usuario de rol **SUPERADMIN** y abre la API en la misma ventana. No hay claves de por medio. |
-| **Token** | **Otras aplicaciones** con su propio login | `POST /api/auth/login/` con el correo y la contraseña de un **SUPERADMIN** de esta base; luego `Authorization: Bearer <token>` en cada petición |
-| **Clave** | Tus propios scripts, sin usuario detrás | Encabezado `X-API-Key: <clave>` (o `?clave=<clave>`) |
+| **Sesión** | Mirar la API tú, desde el navegador | Inicia sesión en el sitio o en `/admin/` y abre la API en la misma ventana. No hay claves de por medio. |
+| **Token** | **Otras aplicaciones** con su propio login (la app móvil) | `POST /api/auth/login/` con el correo y la contraseña; luego `Authorization: Bearer <token>` en cada petición |
+| **Clave** | Tus propios scripts, sin usuario detrás | Encabezado `X-API-Key: <clave>` (o `?clave=<clave>`). Sin límites: es el sitio llamándose a sí mismo |
 
 La diferencia entre el token y la clave: el **token pertenece a una persona**
-(se sabe quién consulta, se revoca solo a esa aplicación y deja de servir en el
-momento en que esa cuenta deja de ser super administrador), mientras que la
-**clave es única para todo el sitio** y no distingue quién la usa.
+(se sabe quién consulta, se revoca solo a esa aplicación, y sus permisos son
+los de esa persona), mientras que la **clave es única para todo el sitio** y no
+distingue quién la usa.
 
-Un superusuario de Django entra siempre, tenga el rol que tenga. Puedes ampliar
-los roles con `API_ROLES=SUPERADMIN,ADMIN` en el `.env`.
+> **Los permisos no viajan dentro del token.** El token guarda, para poder
+> auditarlo, el rol con el que nació; pero en **cada petición** el servidor
+> vuelve a calcular los permisos a partir del usuario. Si a alguien le cambian
+> el rol o le quitan un curso, su token sigue sirviendo pero ya solo abre lo
+> que le corresponde **ahora**, sin esperar a que caduque.
 
 **Si solo la vas a consultar desde el navegador, puedes dejar `API_CLAVE` vacía
 y borrarla del `.env`.** La sesión basta.
 
-`API_MODO` decide qué pasa con quien **no** se identifica de ninguna de las dos
-formas:
+`API_MODO` decide qué pasa con quien **no** se identifica de ninguna forma:
 
-| | `/api/` y `/api/estado/` | Catálogo (facultades, cursos, módulos, tareas, quizzes, reportes) | Datos personales (`usuarios`, `estudiantes`) |
-|---|---|---|---|
-| `API_MODO=privada` *(por defecto)* | Abiertos | Sesión o clave | Sesión o clave |
-| `API_MODO=publica` | Abiertos | Abiertos a cualquiera | Sesión o clave |
+| | `/api/` y `/api/estado/` | Catálogo (facultades, cursos, módulos, tareas, quizzes) | Datos personales (`usuarios`, `estudiantes`) | Escribir |
+|---|---|---|---|---|
+| `API_MODO=privada` *(por defecto)* | Abiertos | Hay que identificarse | Hay que identificarse | Hay que identificarse |
+| `API_MODO=publica` | Abiertos | Abierto a cualquiera, solo lectura | Hay que identificarse | Hay que identificarse |
+
+En modo público el visitante anónimo es, para el sistema de permisos, un rol
+más (`VISITANTE`) que solo puede mirar el catálogo. Nunca puede escribir ni
+acercarse a un dato personal, aunque el modo esté abierto.
 
 `/api/auth/login/` tampoco pide nada: es justamente la puerta por la que se
 entra. `/api/` y `/api/estado/` nunca piden nada: el índice no devuelve datos del
@@ -713,27 +741,85 @@ instante, sin esperar a que caduquen.
 
 ### Recursos disponibles
 
+Todas las rutas devuelven **solo lo que el alcance del usuario permite**, y
+rechazan con `403` lo que su rol no puede hacer. `GET /api/` las lista todas
+con los métodos que acepta cada una.
+
+**Identificarse**
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET /api/` | Índice: recursos, métodos, filtros y paginación |
+| `GET /api/estado/` | Salud del servicio: versión, conexión a la base y totales |
+| `POST /api/auth/login/` | Cambia correo + contraseña por un token. Devuelve el **rol** y los **permisos**. Con `"sesion": true` es además el login del sitio |
+| `GET /api/auth/verificar/` | ¿Sigue sirviendo el token? Devuelve el rol y los permisos **de ahora** |
+| `POST /api/auth/logout/` | Revoca el token con el que se llama y cierra la sesión de Django |
+
+**Lo mío** — la pantalla de inicio de cada rol
+
 | Método y ruta | Qué devuelve |
 |---|---|
-| `GET /api/` | Índice: lista todos los recursos, filtros y opciones de paginación |
-| `GET /api/estado/` | Salud del servicio: versión, conexión a la base y totales |
-| `POST /api/auth/login/` | Cambia correo + contraseña de un SUPERADMIN por un token. Con `"sesion": true` es además el login del sitio |
-| `GET /api/auth/verificar/` | ¿Quien pregunta está identificado como super administrador? |
-| `POST /api/auth/logout/` | Revoca el token con el que se llama y cierra la sesión de Django |
-| `GET /api/facultades/` | Listado de facultades con su número de cursos |
-| `GET /api/facultades/<código>/` | Una facultad y sus cursos (ej. `FIEC`) |
-| `GET /api/cursos/` | Catálogo de cursos (paginado) |
-| `GET /api/cursos/<código>/` | Curso completo: fórmula, módulos, materiales, tareas y quizzes |
-| `GET /api/cursos/<código>/modulos/` | Módulos del curso con sus materiales |
-| `GET /api/cursos/<código>/tareas/` | Tareas del curso |
-| `GET /api/cursos/<código>/quizzes/` | Quizzes del curso |
-| `GET /api/quizzes/<id>/` | Quiz con sus preguntas (**sin** las respuestas correctas) |
-| `GET /api/reportes/resumen/` | Indicadores del tablero: totales, promedios y estado de entregas |
-| `GET /api/usuarios/` | 🔒 Usuarios registrados (datos personales) |
-| `GET /api/cursos/<código>/estudiantes/` | 🔒 Estudiantes inscritos en un curso |
+| `GET /api/mi/panel/` | El tablero que corresponde al rol de quien pregunta. El campo `tipo` dice cuál es (`superadmin`, `admin`, `profesor`, `estudiante`) |
+| `GET /api/mi/permisos/` | Qué puede ver, crear, editar y eliminar, recurso por recurso |
+| `GET`/`PATCH` `/api/mi/perfil/` | Su ficha. Al editarla solo se aceptan sus datos de contacto y su contraseña |
+| `GET /api/mi/cursos/` | Sus cursos, cada uno con `puedo` (lo que puede hacer **en ese** curso) y `mi_rol` |
+| `GET /api/mi/tareas/` | Sus tareas. Al estudiante le dice si ya entregó y su nota; al profesor, cuántas le faltan por calificar |
+
+**Catálogo académico**
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET`/`POST` `/api/facultades/` | Listar / crear facultades |
+| `GET`/`PATCH` `/api/facultades/<código>/` | Una facultad y sus cursos / corregirla |
+| `GET`/`POST` `/api/cursos/` | Listar sus cursos / abrir uno nuevo |
+| `GET`/`PATCH`/`DELETE` `/api/cursos/<código>/` | Curso completo (fórmula, módulos, tareas, quizzes) / editarlo / eliminarlo |
+| `GET`/`POST` `/api/cursos/<código>/modulos/` | Módulos con sus materiales / añadir uno |
+| `GET`/`PATCH`/`DELETE` `/api/modulos/<id>/` | Un módulo / editarlo / eliminarlo |
+| `POST /api/modulos/<id>/materiales/` | Colgar un video, PDF o enlace |
+| `PATCH`/`DELETE` `/api/materiales/<id>/` | Editar / eliminar un material |
+| `POST`/`PATCH` `/api/modulos/<id>/progreso/` | El estudiante marca (o desmarca) el módulo como completado |
+| `GET /api/cursos/<código>/progreso/` | Avance por módulos: el suyo, o el de todos si es profesor |
+
+**Evaluaciones**
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET`/`POST` `/api/cursos/<código>/tareas/` | Tareas del curso / publicar una |
+| `GET`/`PATCH`/`DELETE` `/api/tareas/<id>/` | Una tarea / editarla / eliminarla |
+| `GET`/`POST` `/api/tareas/<id>/entregas/` | Entregas (las suyas, o todas si es profesor) / entregar |
+| `PATCH /api/entregas/<id>/` | Calificar. El estudiante puede corregir su entrega **mientras no tenga nota** |
+| `GET`/`POST` `/api/cursos/<código>/quizzes/` | Quizzes del curso / crear uno |
+| `GET`/`PATCH`/`DELETE` `/api/quizzes/<id>/` | Quiz con sus preguntas / editarlo / eliminarlo |
+| `POST /api/quizzes/<id>/preguntas/` | Añadir una pregunta |
+| `PATCH`/`DELETE` `/api/preguntas/<id>/` | Editar / eliminar una pregunta |
+| `GET`/`POST` `/api/quizzes/<id>/respuestas/` | Intentos / rendir el quiz (se corrige solo lo auto-corregible) |
+| `PATCH /api/respuestas/<id>/` | El profesor pone la nota manual |
+
+**Personas**
+
+| Método y ruta | Qué hace |
+|---|---|
+| `GET`/`POST` `/api/usuarios/` | 🔒 Las personas de su alcance / dar de alta |
+| `GET`/`PATCH`/`DELETE` `/api/usuarios/<id>/` | 🔒 Una ficha / editarla / eliminarla |
+| `GET`/`POST` `/api/cursos/<código>/estudiantes/` | 🔒 Inscritos (`?rol=PROFESOR` o `?rol=todos`) / matricular |
+| `DELETE /api/inscripciones/<id>/` | 🔒 Dar de baja de un curso |
+| `GET /api/reportes/resumen/` | Indicadores, calculados solo sobre los cursos que alcanza |
 
 Los cursos y las facultades se buscan por su **código** (`DAWM-2026A`, `FIEC`),
 no por su `id`, y no distingue mayúsculas de minúsculas.
+
+#### Sobre eliminar
+
+Dos reglas que conviene conocer antes de pulsar el botón:
+
+- **Un curso se elimina con todo su andamiaje** (módulos, materiales, tareas,
+  quizzes, la fórmula y las inscripciones): eso es parte del curso. Pero si ya
+  hay **trabajo de estudiantes** —entregas, quizzes rendidos o módulos
+  marcados— se rechaza con `409` y el motivo `tiene_trabajo`. Archívalo
+  (`"estado": "archivado"`) en vez de borrarlo.
+- Lo demás está protegido por el modelo: si algo depende de un registro, la
+  respuesta es un `409` con `tiene_dependencias` explicando cuántos, no un
+  error del servidor.
 
 ### Filtros y paginación
 

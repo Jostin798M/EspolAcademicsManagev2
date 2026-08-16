@@ -116,8 +116,15 @@ class ApiPublicaTest(ApiBaseTest):
         self.assertEqual(respuesta.status_code, 404)
         self.assertFalse(self.cuerpo(respuesta)['ok'])
 
-    def test_metodo_post_no_permitido(self):
+    def test_crear_un_curso_sin_identificarse_no_se_permite(self):
+        """El catalogo esta abierto para mirar, no para escribir en el."""
         respuesta = self.client.post(reverse('api:cursos'))
+
+        self.assertEqual(respuesta.status_code, 401)
+        self.assertEqual(self.cuerpo(respuesta)['motivo'], 'sin_credenciales')
+
+    def test_metodo_sin_ruta_devuelve_405(self):
+        respuesta = self.client.delete(reverse('api:facultades'))
 
         self.assertEqual(respuesta.status_code, 405)
 
@@ -231,12 +238,19 @@ class ApiSesionTest(ApiBaseTest):
         self.assertEqual(respuesta.status_code, 200)
         self.assertEqual(self.cuerpo(respuesta)['paginacion']['total'], 3)
 
-    def test_usuario_normal_no_entra(self):
+    def test_el_estudiante_entra_pero_solo_se_ve_a_si_mismo(self):
+        """
+        El listado de usuarios ya no le cierra la puerta a un estudiante:
+        se la abre a una habitacion con una sola ficha dentro, la suya.
+        """
         self.client.force_login(self.estudiante)
 
         respuesta = self.client.get(reverse('api:usuarios'))
+        cuerpo = self.cuerpo(respuesta)
 
-        self.assertEqual(respuesta.status_code, 401)
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(cuerpo['paginacion']['total'], 1)
+        self.assertEqual(cuerpo['datos'][0]['correo'], self.estudiante.correo)
 
     def test_superadmin_inactivo_no_entra(self):
         self.superadmin.is_active = False
@@ -358,15 +372,45 @@ class ApiAutenticacionTest(ApiBaseTest):
         self.assertFalse(TokenApi.objects.filter(huella=plano).exists())
         self.assertEqual(TokenApi.objects.get().prefijo, plano[:TokenApi.LARGO_PREFIJO])
 
-    def test_usuario_sin_rol_superadmin_recibe_el_aviso(self):
+    def test_un_estudiante_tambien_recibe_su_token(self):
+        """
+        El cambio de fondo: el login dejo de ser una aduana de super
+        administradores. Cualquier cuenta activa entra, y lo que la
+        distingue viaja en el propio token.
+        """
         respuesta = self.login(correo='alumno@espol.edu.ec')
-        cuerpo = self.cuerpo(respuesta)
+        datos = self.cuerpo(respuesta)['datos']
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(datos['autorizado'])
+        self.assertTrue(datos['token'])
+        self.assertEqual(datos['rol'], 'ESTUDIANTE')
+        self.assertEqual(TokenApi.objects.count(), 1)
+        self.assertEqual(TokenApi.objects.first().rol, 'ESTUDIANTE')
+
+    def test_el_token_del_estudiante_no_le_deja_crear_cursos(self):
+        """Entra, pero no puede lo que no le toca: 403 con el motivo."""
+        datos = self.cuerpo(self.login(correo='alumno@espol.edu.ec'))['datos']
+
+        respuesta = self.client.post(
+            reverse('api:cursos'),
+            data=json.dumps({'nombre': 'Mio', 'codigo': 'X1', 'profesor': '1'}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {datos["token"]}',
+        )
 
         self.assertEqual(respuesta.status_code, 403)
-        self.assertFalse(cuerpo['autorizado'])
-        self.assertEqual(cuerpo['error'], 'No se ha autorizado que sea un super admin.')
-        self.assertEqual(cuerpo['motivo'], 'no_superadmin')
-        self.assertEqual(TokenApi.objects.count(), 0)
+        self.assertEqual(self.cuerpo(respuesta)['motivo'], 'sin_permiso')
+
+    def test_el_login_describe_lo_que_el_rol_puede_hacer(self):
+        """La app dibuja su menu con esto, sin adivinar nada."""
+        datos = self.cuerpo(self.login(correo='alumno@espol.edu.ec'))['datos']
+        recursos = datos['permisos']['recursos']
+
+        self.assertEqual(datos['permisos']['rol'], 'ESTUDIANTE')
+        self.assertEqual(recursos['cursos']['acciones'], ['ver'])
+        self.assertIn('crear', recursos['entregas']['acciones'])
+        self.assertEqual(recursos['usuarios']['ver'], 'propio')
 
     def test_cuenta_inactiva_no_recibe_token(self):
         self.superadmin.estado = Usuario.Estado.INACTIVO
@@ -443,18 +487,19 @@ class ApiAutenticacionTest(ApiBaseTest):
         # Sin mandar el token: entra por la cookie que acaba de abrirse.
         self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 200)
 
-    def test_el_sitio_deja_entrar_a_quien_no_es_superadmin_pero_sin_api(self):
+    def test_el_sitio_deja_entrar_a_cualquiera_con_su_propio_alcance(self):
         respuesta = self.login(correo='alumno@espol.edu.ec', sesion=True)
         datos = self.cuerpo(respuesta)['datos']
 
         self.assertEqual(respuesta.status_code, 200)
-        self.assertFalse(datos['autorizado'])
-        self.assertIsNone(datos['token'])
-        self.assertEqual(datos['aviso'], 'No se ha autorizado que sea un super admin.')
+        self.assertTrue(datos['autorizado'])
         self.assertEqual(datos['usuario']['rol'], 'USER')
+        self.assertEqual(datos['usuario']['rol_efectivo'], 'ESTUDIANTE')
 
-        # La cookie existe, pero la API sigue cerrada para ese rol.
-        self.assertEqual(self.client.get(reverse('api:usuarios')).status_code, 401)
+        # La cookie sirve, y lo que ve por ella es lo suyo y nada mas.
+        cuerpo = self.cuerpo(self.client.get(reverse('api:usuarios')))
+
+        self.assertEqual(cuerpo['paginacion']['total'], 1)
 
     def test_el_login_dice_con_que_rol_entra_un_usuario(self):
         alumno = self.cuerpo(self.login(correo='alumno@espol.edu.ec', sesion=True))
@@ -497,10 +542,16 @@ class ApiAutenticacionTest(ApiBaseTest):
         self.assertEqual(respuesta.status_code, 403)
         self.assertEqual(self.cuerpo(respuesta)['motivo'], 'cuenta_inactiva')
 
-    def test_sin_pedir_sesion_el_no_superadmin_sigue_recibiendo_403(self):
-        respuesta = self.login(correo='alumno@espol.edu.ec')
+    def test_un_rol_apartado_de_la_api_no_entra(self):
+        """
+        API_ROLES es la valvula de cierre: si un rol se saca de la lista,
+        deja de entrar aunque su cuenta este perfecta.
+        """
+        with override_settings(API_ROLES=['SUPERADMIN']):
+            respuesta = self.login(correo='alumno@espol.edu.ec')
 
         self.assertEqual(respuesta.status_code, 403)
+        self.assertEqual(self.cuerpo(respuesta)['motivo'], 'rol_sin_acceso')
 
     # ── Uso del token ────────────────────────────────────────────────────
 
@@ -526,7 +577,7 @@ class ApiAutenticacionTest(ApiBaseTest):
         cuerpo = self.cuerpo(respuesta)
 
         self.assertEqual(respuesta.status_code, 401)
-        self.assertEqual(cuerpo['error'], 'No se ha autorizado que sea un super admin.')
+        self.assertEqual(cuerpo['error'], 'No se ha podido comprobar tu identidad.')
         self.assertEqual(cuerpo['motivo'], 'token_invalido')
         self.assertIn('token', cuerpo['como_autorizarse'])
 
@@ -539,16 +590,34 @@ class ApiAutenticacionTest(ApiBaseTest):
         self.assertEqual(respuesta.status_code, 401)
         self.assertEqual(self.cuerpo(respuesta)['motivo'], 'token_caducado')
 
-    def test_si_el_usuario_deja_de_ser_superadmin_el_token_muere(self):
+    def test_si_al_usuario_le_bajan_el_rol_el_token_encoge(self):
+        """
+        El token no lleva los permisos grabados a fuego: se recalculan en
+        cada peticion. Al degradar la cuenta, el mismo token de siempre
+        sigue abriendo la API pero ya solo ensena lo del rol nuevo.
+        """
         token = self.token_valido()
 
         self.superadmin.rol = Usuario.Rol.USER
-        self.superadmin.save(update_fields=['rol'])
+        self.superadmin.is_superuser = False
+        self.superadmin.save(update_fields=['rol', 'is_superuser'])
 
         respuesta = self.con_token(reverse('api:usuarios'), token)
+        cuerpo = self.cuerpo(respuesta)
 
-        self.assertEqual(respuesta.status_code, 403)
-        self.assertEqual(self.cuerpo(respuesta)['motivo'], 'no_superadmin')
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(cuerpo['paginacion']['total'], 1)
+
+        # Y lo que antes si podia, ahora no.
+        creacion = self.client.post(
+            reverse('api:usuarios'),
+            data=json.dumps({}),
+            content_type='application/json',
+            HTTP_AUTHORIZATION=f'Bearer {token}',
+        )
+
+        self.assertEqual(creacion.status_code, 403)
+        self.assertEqual(self.cuerpo(creacion)['motivo'], 'sin_permiso')
 
     def test_el_token_anota_su_ultimo_uso(self):
         token = self.token_valido()
@@ -559,13 +628,13 @@ class ApiAutenticacionTest(ApiBaseTest):
 
     # ── Verificar ────────────────────────────────────────────────────────
 
-    def test_verificar_sin_credenciales_avisa_que_no_es_superadmin(self):
+    def test_verificar_sin_credenciales_pide_identificarse(self):
         respuesta = self.client.get(reverse('api:auth_verificar'))
         cuerpo = self.cuerpo(respuesta)
 
         self.assertEqual(respuesta.status_code, 401)
         self.assertFalse(cuerpo['autorizado'])
-        self.assertEqual(cuerpo['error'], 'No se ha autorizado que sea un super admin.')
+        self.assertEqual(cuerpo['error'], 'No se ha podido comprobar tu identidad.')
         self.assertEqual(cuerpo['motivo'], 'sin_credenciales')
 
     @override_settings(API_MODO='publica')
@@ -592,13 +661,16 @@ class ApiAutenticacionTest(ApiBaseTest):
 
         self.assertEqual(cuerpo['datos']['via'], 'sesion')
 
-    def test_verificar_con_sesion_de_usuario_normal_no_autoriza(self):
+    def test_verificar_reconoce_al_estudiante_y_le_dice_su_rol(self):
         self.client.force_login(self.estudiante)
 
         respuesta = self.client.get(reverse('api:auth_verificar'))
+        datos = self.cuerpo(respuesta)['datos']
 
-        self.assertEqual(respuesta.status_code, 401)
-        self.assertFalse(self.cuerpo(respuesta)['autorizado'])
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(datos['autorizado'])
+        self.assertEqual(datos['rol'], 'ESTUDIANTE')
+        self.assertEqual(datos['permisos']['recursos']['usuarios']['ver'], 'propio')
 
     # ── Logout ───────────────────────────────────────────────────────────
 
@@ -649,7 +721,8 @@ class ApiAutenticacionTest(ApiBaseTest):
     def test_el_indice_publica_las_rutas_de_login(self):
         datos = self.cuerpo(self.client.get(reverse('api:indice')))['datos']
 
-        self.assertIn('auth_login (POST)', datos['recursos'])
+        self.assertIn('auth_login', datos['recursos'])
+        self.assertEqual(datos['metodos_por_recurso']['auth_login'], ['POST'])
         self.assertIn('token', datos['seguridad']['vias'])
 
     def test_cors_permite_el_encabezado_de_autorizacion(self):

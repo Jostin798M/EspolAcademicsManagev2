@@ -12,7 +12,7 @@ from django.core.paginator import EmptyPage, Paginator
 from django.http import Http404, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
-from . import seguridad
+from . import permisos, seguridad
 
 
 class ErrorApi(Exception):
@@ -108,22 +108,37 @@ def esta_autenticado(request):
     return seguridad.por_sesion(request) or seguridad.por_clave(request)
 
 
-def endpoint(privado=False, abierto=False, metodos=('GET',)):
+#: Metodos que cambian datos: necesitan quedar exentos de CSRF, porque no se
+#: autentican con la cookie sino con el token del encabezado.
+METODOS_QUE_ESCRIBEN = ('POST', 'PUT', 'PATCH', 'DELETE')
+
+
+def endpoint(privado=False, abierto=False, metodos=('GET',), recurso=None,
+             accion=None):
     """
     Decorador de las vistas de la API.
 
     Acepta los metodos indicados, comprueba el acceso y convierte cualquier
     error (incluido un 404) en una respuesta JSON coherente. Cuando el
     acceso se concede, deja el resultado en request.acceso para que la
-    vista sepa quien pregunta.
+    vista sepa quien pregunta y con que rol.
+
+    recurso es uno de los de permisos.py ('cursos', 'tareas', 'usuarios'...).
+    Si se indica, ademas de identificar al usuario se comprueba que su rol
+    tenga permiso sobre ese recurso. La accion se deduce del metodo HTTP
+    (GET=ver, POST=crear, PATCH/PUT=editar, DELETE=eliminar), asi que una
+    misma vista con varios metodos pide el permiso correcto en cada llamada;
+    accion= la fija a mano cuando el metodo no cuenta toda la historia (por
+    ejemplo un POST que en realidad califica, y por tanto edita).
+
+    Lo que este decorador NO comprueba es el alcance: que el registro
+    concreto sea de su facultad o de su curso. Eso solo se puede saber
+    despues de buscarlo, y por eso lo hace cada vista con las funciones de
+    permisos.py.
 
     abierto=True omite la comprobacion: se usa en los recursos que no
     devuelven datos del sistema (el indice, la salud del servicio y el
     login), para que cualquiera pueda descubrir la API desde el navegador.
-
-    metodos=('POST',) habilita el envio de datos; esas rutas quedan exentas
-    de CSRF porque no se autentican con la cookie de sesion, sino con el
-    cuerpo (login) o con el encabezado del token.
     """
     permitidos = tuple(metodos) + ('HEAD', 'OPTIONS')
 
@@ -138,8 +153,15 @@ def endpoint(privado=False, abierto=False, metodos=('GET',)):
                 )
 
             try:
-                acceso = seguridad.autorizar(request, privado)
+                pedida = accion or permisos.ACCION_DE_METODO.get(
+                    request.method, permisos.VER,
+                )
+
+                acceso = seguridad.autorizar(
+                    request, privado, recurso=recurso, accion=pedida,
+                )
                 request.acceso = acceso
+                request.accion = pedida
 
                 if not abierto and not acceso:
                     return no_autorizado(request, acceso)
@@ -150,11 +172,66 @@ def endpoint(privado=False, abierto=False, metodos=('GET',)):
             except Http404 as exc:
                 return error(str(exc) or 'Recurso no encontrado.', 404)
 
-        if 'POST' in metodos:
+        if any(metodo in metodos for metodo in METODOS_QUE_ESCRIBEN):
             return csrf_exempt(envoltura)
 
         return envoltura
     return decorador
+
+
+def segun_metodo(**vistas):
+    """
+    Reparte una misma URL entre varias vistas segun el metodo HTTP.
+
+        path('cursos/', segun_metodo(GET=views.cursos, POST=escritura.crear_curso))
+
+    Django enruta por direccion, no por metodo, y una API bien hecha usa la
+    misma direccion para listar y para crear. Esto lo resuelve sin mezclar
+    las dos vistas en una sola funcion llena de "if request.method".
+
+    Si llega un metodo sin vista se entrega a la de lectura, que responde el
+    405 de siempre enumerando los que si valen.
+    """
+    def reparto(request, *args, **kwargs):
+        vista = vistas.get(request.method) or vistas.get('GET') or next(iter(vistas.values()))
+
+        return vista(request, *args, **kwargs)
+
+    return csrf_exempt(reparto)
+
+
+def quien(request):
+    """
+    El Usuario que hace la peticion, o None si es la clave del sitio.
+
+    Atajo para las vistas: request.acceso.persona se escribe en todas y
+    conviene que se lea corto.
+    """
+    acceso = getattr(request, 'acceso', None)
+
+    return acceso.usuario if acceso else None
+
+
+def exigir_alcance(request, permitido, recurso, detalle=''):
+    """
+    Corta la vista si el registro esta fuera del alcance de quien pregunta.
+
+    Se llama despues de haber buscado el objeto: permitido es el resultado
+    de permisos.alcanza_curso() o similar. Levanta ErrorApi, que el
+    decorador convierte en la respuesta JSON de siempre.
+    """
+    if permitido:
+        return
+
+    negado = seguridad.negar_alcance(quien(request), recurso, detalle)
+
+    raise ErrorApi(
+        negado.mensaje,
+        negado.codigo,
+        autorizado=False,
+        motivo=negado.motivo,
+        detalle=negado.detalle,
+    )
 
 
 def entero(request, nombre, por_defecto, minimo=1, maximo=None):

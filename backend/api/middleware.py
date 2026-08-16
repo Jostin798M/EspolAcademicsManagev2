@@ -46,8 +46,11 @@ class CorsApiMiddleware:
         else:
             return
 
-        # POST solo lo usan las rutas de /api/auth/ (login y logout).
-        respuesta['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+        # La API ya no es de solo lectura: se crea con POST, se corrige
+        # con PATCH/PUT y se borra con DELETE.
+        respuesta['Access-Control-Allow-Methods'] = (
+            'GET, POST, PATCH, PUT, DELETE, OPTIONS'
+        )
         respuesta['Access-Control-Allow-Headers'] = (
             'Authorization, X-API-Token, X-API-Key, Content-Type'
         )

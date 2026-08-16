@@ -4,6 +4,12 @@ Conversion de los modelos de Django a diccionarios listos para JSON.
 Cada funcion recibe una instancia y devuelve un dict con nombres de campo
 iguales a los de la base de datos, para que el consumidor externo pueda
 relacionarlos con el modelo entidad-relacion del proyecto.
+
+Algunas aceptan un argumento que decide cuanto ensenar: quiz_json solo
+incluye la respuesta correcta si quien pregunta puede editar el quiz, y
+curso_detalle_json adjunta lo que ese usuario puede hacer dentro del curso.
+La regla de quien puede que cosa no vive aqui -eso es permisos.py-; aqui
+solo se obedece.
 """
 
 
@@ -114,7 +120,7 @@ def tarea_json(tarea):
     }
 
 
-def quiz_json(quiz, con_preguntas=False):
+def quiz_json(quiz, con_preguntas=False, con_respuestas=False):
     datos = {
         'id_quiz': quiz.id_quiz,
         'titulo': quiz.titulo,
@@ -129,26 +135,46 @@ def quiz_json(quiz, con_preguntas=False):
 
     if con_preguntas:
         datos['preguntas'] = [
-            pregunta_json(pregunta) for pregunta in quiz.preguntas.all()
+            pregunta_json(pregunta, con_respuesta=con_respuestas)
+            for pregunta in quiz.preguntas.all()
         ]
 
     return datos
 
 
-def pregunta_json(pregunta):
-    """No se expone respuesta_correcta: la API es de consulta publica."""
-    return {
+def pregunta_json(pregunta, con_respuesta=False):
+    """
+    Una pregunta del quiz.
+
+    respuesta_correcta solo viaja cuando con_respuesta es True, y eso solo
+    ocurre para quien puede editar el quiz: el profesor que lo arma la
+    necesita, el estudiante que lo va a rendir no.
+    """
+    datos = {
         'id_pregunta': pregunta.id_pregunta,
         'tipo': pregunta.tipo,
         'enunciado': pregunta.enunciado,
         'puntaje': _numero(pregunta.puntaje),
         'orden': pregunta.orden,
         'opciones': pregunta.opciones,
+        'quiz': pregunta.quiz_id,
     }
 
+    if con_respuesta:
+        datos['respuesta_correcta'] = pregunta.respuesta_correcta
 
-def curso_detalle_json(curso):
-    """Curso con su formula, modulos, tareas y quizzes."""
+    return datos
+
+
+def curso_detalle_json(curso, puedo=None):
+    """
+    Curso con su formula, modulos, tareas y quizzes.
+
+    puedo es {recurso: [acciones]} calculado por
+    permisos.acciones_en_curso(): lo que quien pregunta puede hacer dentro
+    de ESTE curso. La app lo usa para decidir que botones dibuja en la
+    pantalla del curso.
+    """
     datos = curso_json(curso)
 
     datos['formula'] = [
@@ -159,6 +185,9 @@ def curso_detalle_json(curso):
     ]
     datos['tareas'] = [tarea_json(tarea) for tarea in curso.tareas.all()]
     datos['quizzes'] = [quiz_json(quiz) for quiz in curso.quizzes.all()]
+
+    if puedo is not None:
+        datos['puedo'] = puedo
 
     return datos
 
@@ -171,4 +200,64 @@ def inscripcion_json(inscripcion):
         'fecha': _fecha(inscripcion.fecha),
         'curso': inscripcion.curso.codigo,
         'usuario': usuario_json(inscripcion.usuario),
+    }
+
+
+def entrega_json(entrega, con_estudiante=True):
+    """
+    Una entrega de tarea.
+
+    con_estudiante=False lo usa el estudiante al mirar las suyas: ahi el
+    nombre sobra, y asi la misma funcion sirve para el profesor que revisa
+    la lista completa.
+    """
+    datos = {
+        'id_entrega': entrega.id_entrega,
+        'tarea': entrega.tarea_id,
+        'tarea_titulo': entrega.tarea.titulo,
+        'curso': entrega.tarea.curso.codigo,
+        'estado': entrega.estado,
+        'fecha': _fecha(entrega.fecha),
+        'texto': entrega.texto,
+        'archivo': entrega.archivo,
+        'imagen': entrega.imagen,
+        'link': entrega.link,
+        'nota': _numero(entrega.nota),
+        'puntaje_maximo': _numero(entrega.tarea.puntaje_maximo),
+        'comentario': entrega.comentario,
+        'calificada': entrega.nota is not None,
+    }
+
+    if con_estudiante:
+        datos['usuario'] = entrega.usuario_id
+        datos['estudiante'] = entrega.usuario.nombre_completo
+
+    return datos
+
+
+def progreso_json(progreso):
+    """Marca de un modulo completado por un estudiante."""
+    return {
+        'id_progreso': progreso.id_progreso,
+        'modulo': progreso.modulo_id,
+        'modulo_titulo': progreso.modulo.titulo,
+        'curso': progreso.modulo.curso.codigo,
+        'usuario': progreso.usuario_id,
+        'completado': progreso.completado,
+        'fecha': _fecha(progreso.fecha),
+    }
+
+
+def respuesta_quiz_json(respuesta):
+    """Intento de un estudiante en un quiz, con la nota que saco."""
+    return {
+        'id_respuesta_quiz': respuesta.id_respuesta_quiz,
+        'quiz': respuesta.quiz_id,
+        'quiz_titulo': respuesta.quiz.titulo,
+        'curso': respuesta.quiz.curso.codigo,
+        'usuario': respuesta.usuario_id,
+        'estudiante': respuesta.usuario.nombre_completo,
+        'nota_automatica': _numero(respuesta.nota_automatica),
+        'nota_manual': _numero(respuesta.nota_manual),
+        'fecha': _fecha(respuesta.fecha),
     }

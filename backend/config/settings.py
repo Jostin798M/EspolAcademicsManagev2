@@ -177,24 +177,35 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_SECURE_HSTS_SECONDS', '0'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = SECURE_HSTS_SECONDS > 0
 
-# ── API PUBLICA (/api/) ───────────────────────────────────────
+# ── API (/api/) ───────────────────────────────────────────────
 # Se entra de tres formas y basta con una (ver api/seguridad.py):
-#   1. sesion iniciada en el sitio con un usuario SUPERADMIN;
-#   2. token pedido en POST /api/auth/login/ con las credenciales de un
-#      usuario SUPERADMIN (es la via de las otras aplicaciones);
-#   3. clave del sitio en el encabezado X-API-Key.
+#   1. sesion iniciada en el sitio (la cookie de Django);
+#   2. token pedido en POST /api/auth/login/ con el correo y la contrasena
+#      (es la via de la app movil y de cualquier otra aplicacion);
+#   3. clave del sitio en el encabezado X-API-Key, para scripts propios.
+#
+# Entra CUALQUIER cuenta activa, no solo el super administrador. Lo que
+# cambia de un rol a otro es que puede hacer y sobre que datos, y eso lo
+# decide api/permisos.py:
+#
+#   SUPERADMIN -> todo el sistema
+#   ADMIN      -> su facultad
+#   PROFESOR   -> los cursos que dicta
+#   ESTUDIANTE -> los cursos que cursa y sus propios datos
 #
 # API_MODO controla el catalogo academico (facultades, cursos, modulos,
-# tareas, quizzes, reportes):
-#   privada -> exige sesion de superadmin o clave (por defecto)
-#   publica -> cualquiera puede consultarlo sin identificarse
-# Los datos personales (usuarios, estudiantes) exigen siempre una de las
-# dos vias, aunque el modo sea publico.
+# tareas, quizzes, reportes) para quien NO se identifica:
+#   privada -> hay que identificarse siempre (por defecto)
+#   publica -> el catalogo se puede leer sin credenciales
+# Los datos personales y todo lo que escriba exigen identificarse, aunque
+# el modo sea publico.
 API_MODO = os.environ.get('API_MODO', 'privada').strip().lower()
 
-# Roles que pueden usar la API con su sesion. Un superusuario de Django
-# entra siempre, tenga el rol que tenga.
-API_ROLES = env_list('API_ROLES', 'SUPERADMIN')
+# Roles que pueden entrar a la API. Por defecto los cuatro; se recorta aqui
+# si algun dia hay que cerrarle la puerta a un rol entero (por ejemplo
+# API_ROLES=SUPERADMIN,ADMIN para dejar la API solo a administracion).
+# Un superusuario de Django entra siempre, tenga el rol que tenga.
+API_ROLES = env_list('API_ROLES', 'SUPERADMIN,ADMIN,PROFESOR,ESTUDIANTE')
 
 # Clave para programas externos (curl, otra aplicacion). Es opcional:
 # si queda vacia, solo se entra con sesion de super administrador.

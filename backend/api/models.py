@@ -9,6 +9,13 @@ En la tabla NO se guarda el token, sino su huella SHA-256. Si alguien lee la
 base de datos no puede reconstruirlo; el texto del token solo se ve una vez,
 en la respuesta del login.
 
+Cada token queda sellado con el rol y los permisos que tenia su dueno al
+emitirlo (campos rol y permisos). Ese sello NO es lo que autoriza -en cada
+peticion se vuelven a calcular los permisos reales del usuario, para que un
+cambio de rol tenga efecto al instante-, sino el registro de con que
+credencial se entrego: sirve para auditar y para que la aplicacion sepa, al
+recibirlo, que puede dibujar en su pantalla.
+
 El resto de la API expone en JSON los modelos de accounts, cursos y
 evaluaciones (ver serializadores.py).
 """
@@ -39,6 +46,8 @@ class TokenApiManager(models.Manager):
         Devuelve la pareja (objeto, texto_plano). El texto plano no se puede
         recuperar despues: se entrega una sola vez a quien inicio sesion.
         """
+        from . import permisos
+
         plano = secrets.token_urlsafe(36)
 
         if dias is None:
@@ -53,6 +62,8 @@ class TokenApiManager(models.Manager):
             huella=huella_de(plano),
             expira=expira,
             ip_origen=ip,
+            rol=permisos.rol_efectivo(usuario) or '',
+            permisos=permisos.resumen_corto(usuario),
         )
 
         return token, plano
@@ -95,6 +106,24 @@ class TokenApi(models.Model):
         blank=True,
         db_column='aplicacion',
         verbose_name='Aplicacion que lo solicito',
+    )
+
+    rol = models.CharField(
+        max_length=15,
+        blank=True,
+        db_column='rol',
+        verbose_name='Rol con el que se emitio',
+        help_text='SUPERADMIN, ADMIN, PROFESOR o ESTUDIANTE en el momento '
+                  'de la emision. El rol vigente se recalcula en cada '
+                  'peticion; este campo es el registro de como nacio.',
+    )
+
+    permisos = models.JSONField(
+        default=dict,
+        blank=True,
+        db_column='permisos',
+        verbose_name='Permisos con los que se emitio',
+        help_text='{recurso: [acciones]} tal como estaban al crearlo.',
     )
 
     prefijo = models.CharField(
@@ -154,7 +183,7 @@ class TokenApi(models.Model):
         ordering = ['-creado']
 
     def __str__(self):
-        return f"{self.prefijo}... ({self.usuario.correo})"
+        return f"{self.prefijo}... ({self.usuario.correo} · {self.rol or '?'})"
 
     @property
     def caducado(self):

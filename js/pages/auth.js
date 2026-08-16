@@ -41,24 +41,36 @@ const Auth = {
 
       sessionStorage.setItem("usuario_id", id);
       sessionStorage.setItem("usuario_data", JSON.stringify(usuario));
+
+      /* El rol con el que se entra lo decide el servidor, no esta pagina.
+         Un USER puede ser profesor o estudiante segun sus inscripciones, y
+         quien sabe eso es la base de datos. Aqui solo se guarda para que el
+         menu y las redirecciones sepan a donde llevarlo. */
+      const rol = data.rol || usuario.rol_efectivo || data.rol_activo || usuario.rol;
+      sessionStorage.setItem("rol_efectivo", rol);
       if (data.rol_activo) sessionStorage.setItem("rol_activo", data.rol_activo);
-      this.redirigir(usuario);
+
+      this.redirigir(rol);
     } catch (err) {
-      this.showError("error-form", err.message);
+      /* El servidor explica el motivo aparte del mensaje; si lo mando, se
+         ensena, porque "cuenta inactiva" y "contrasena incorrecta" piden
+         cosas distintas del usuario. */
+      const detalle = err.detalle ? ` ${err.detalle}` : "";
+      this.showError("error-form", err.message + detalle);
       btnLogin.disabled = false;
       btnLogin.innerHTML = '<i class="bi-box-arrow-in-right"></i> Ingresar';
     }
   },
 
-  redirigir(usuario) {
+  /* A donde va cada rol al entrar. */
+  redirigir(rol) {
     const rutas = {
       SUPERADMIN: "/superadmin/dashboard",
       ADMIN:      "/facultad/dashboard",
-      USER:       sessionStorage.getItem("rol_activo") === "PROFESOR"
-                    ? "/profesor/mis-cursos"
-                    : "/estudiante/mis-cursos"
+      PROFESOR:   "/profesor/mis-cursos",
+      ESTUDIANTE: "/estudiante/mis-cursos",
     };
-    window.location.href = rutas[usuario.rol] || LOGIN;
+    window.location.href = rutas[rol] || LOGIN;
   },
 
   /* Un solo "Salir": cierra la sesion de Django (y con ella el acceso

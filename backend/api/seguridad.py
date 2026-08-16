@@ -1,30 +1,38 @@
 """
 Modulo de seguridad de la API.
 
-Decide quien puede consultar cada recurso. Hay tres vias de acceso y basta
-con cumplir una:
+Contesta dos preguntas seguidas, y en este orden:
 
-1. SESION  - haber iniciado sesion en el sitio (/admin/ o /panel/) con un
-             usuario de rol SUPERADMIN. Es la via comoda desde el navegador:
-             no hay que escribir ninguna clave.
-2. TOKEN   - encabezado "Authorization: Bearer <token>". Es la via para
-             otras aplicaciones: piden el token en /api/auth/login/ con el
-             correo y la contrasena de un super administrador de esta base
-             de datos, y con el consultan la API completa. El rol se vuelve
-             a comprobar en CADA peticion, asi que si el usuario deja de ser
-             super administrador el token deja de servir en ese mismo
-             instante.
-3. CLAVE   - encabezado X-API-Key con API_CLAVE. Es una clave unica del
-             sitio, sin usuario detras; sirve para scripts propios.
+    1. ¿QUIEN eres?  -> identificar(request)
+    2. ¿PUEDES esto? -> autorizar(request, recurso, accion)
 
-Si API_CLAVE queda vacia en el .env, la via 3 simplemente no existe.
+La primera es la autenticacion. Hay tres vias y basta con cumplir una:
 
-No devuelve respuestas HTTP: informa del resultado y quien llama decide.
-Asi este modulo no depende de las vistas ni de respuestas.py.
+1. SESION  - haber iniciado sesion en el sitio (/admin/, /panel/ o el propio
+             index.html). Es la via comoda desde el navegador.
+2. TOKEN   - encabezado "Authorization: Bearer <token>". Es la via de las
+             otras aplicaciones (la app movil, por ejemplo): piden el token
+             en /api/auth/login/ con su correo y contrasena.
+3. CLAVE   - encabezado X-API-Key con API_CLAVE. Es una clave del sitio, sin
+             usuario detras; sirve para scripts propios y no tiene limites.
+             Si API_CLAVE queda vacia en el .env, esta via no existe.
+
+La segunda pregunta es la autorizacion, y vive en permisos.py: cada endpoint
+declara sobre que recurso trabaja y que accion hace, y aqui se comprueba
+contra el rol efectivo de quien llama.
+
+Lo importante: los permisos se recalculan en CADA peticion a partir del
+usuario, nunca se leen del token. Si a alguien le cambian el rol o lo dan de
+baja, su token deja de servir para lo que ya no le corresponde en ese mismo
+instante, sin esperar a que caduque.
+
+No devuelve respuestas HTTP: informa del resultado y quien llama decide. Asi
+este modulo no depende de las vistas ni de respuestas.py.
 """
 from django.conf import settings
 from django.core.cache import cache
 
+from . import permisos
 from .models import TokenApi
 
 # Vias de acceso, para poder explicarlas en la respuesta del indice.
@@ -33,10 +41,15 @@ TOKEN = 'token'
 CLAVE = 'clave'
 ABIERTO = 'abierto'
 
-# Mensaje unico de "no autorizado". Se responde siempre el mismo texto para
-# que la aplicacion que consume la API pueda mostrarselo tal cual a su
-# usuario; el detalle tecnico va aparte, en "motivo" y "detalle".
-NO_AUTORIZADO = 'No se ha autorizado que sea un super admin.'
+# Mensajes. Se separan los dos fracasos porque no son lo mismo y la
+# aplicacion que consume la API tiene que reaccionar distinto: ante el
+# primero vuelve a pedir el login, ante el segundo esconde un boton.
+NO_IDENTIFICADO = 'No se ha podido comprobar tu identidad.'
+SIN_PERMISO_MSG = 'Tu rol no tiene permiso para hacer esto.'
+
+# Se conserva el texto antiguo: lo siguen mostrando pantallas que solo
+# hablaban de super administradores.
+NO_AUTORIZADO = NO_IDENTIFICADO
 
 # Motivos: codigos estables para que otra aplicacion decida que hacer
 # (volver a pedir el login, renovar el token, avisar al usuario...).
@@ -44,9 +57,22 @@ SIN_CREDENCIALES = 'sin_credenciales'
 TOKEN_INVALIDO = 'token_invalido'
 TOKEN_CADUCADO = 'token_caducado'
 TOKEN_REVOCADO = 'token_revocado'
-NO_SUPERADMIN = 'no_superadmin'
 CUENTA_INACTIVA = 'cuenta_inactiva'
 CLAVE_INVALIDA = 'clave_invalida'
+ROL_SIN_ACCESO = 'rol_sin_acceso'
+SIN_PERMISO = 'sin_permiso'
+FUERA_DE_ALCANCE = 'fuera_de_alcance'
+
+# Motivo antiguo, cuando la API era solo para super administradores. Ya no
+# se emite, pero se deja definido porque hay clientes que lo comprueban.
+NO_SUPERADMIN = 'no_superadmin'
+
+#: Motivos que significan "vuelve a iniciar sesion". Los demas son un "no
+#: puedes", que no se arregla volviendo a entrar.
+MOTIVOS_DE_SESION = (
+    SIN_CREDENCIALES, TOKEN_INVALIDO, TOKEN_CADUCADO,
+    TOKEN_REVOCADO, CUENTA_INACTIVA, ROL_SIN_ACCESO, NO_SUPERADMIN,
+)
 
 
 class Resultado:
@@ -66,12 +92,27 @@ class Resultado:
     def __bool__(self):
         return self.permitido
 
+    @property
+    def rol(self):
+        """Rol efectivo de quien llama: SUPERADMIN, ADMIN, PROFESOR..."""
+        return permisos.rol_efectivo(self.usuario) if self.usuario else None
 
-def _negar(motivo, detalle, codigo=401):
-    """Denegacion: mensaje siempre igual, motivo y detalle especificos."""
+    @property
+    def persona(self):
+        """El Usuario, o None si detras no hay nadie (clave del sitio)."""
+        if (self.usuario is None
+                or permisos.es_sitio(self.usuario)
+                or permisos.es_visitante(self.usuario)):
+            return None
+
+        return self.usuario
+
+
+def _negar(motivo, detalle, codigo=401, mensaje=None):
+    """Denegacion: mensaje para el usuario, motivo y detalle para la app."""
     return Resultado(
         False,
-        mensaje=NO_AUTORIZADO,
+        mensaje=mensaje or NO_IDENTIFICADO,
         codigo=codigo,
         motivo=motivo,
         detalle=detalle,
@@ -79,8 +120,17 @@ def _negar(motivo, detalle, codigo=401):
 
 
 def roles_permitidos():
-    """Roles que pueden consultar la API. Por defecto solo SUPERADMIN."""
-    return [rol.upper() for rol in getattr(settings, 'API_ROLES', ['SUPERADMIN'])]
+    """
+    Roles que pueden entrar a la API.
+
+    Por defecto los cuatro: la API dejo de ser exclusiva del super
+    administrador y ahora cada rol entra al trozo que le corresponde. Se
+    puede recortar desde el .env con API_ROLES si algun dia hiciera falta
+    cerrarle la puerta a un rol entero.
+    """
+    configurados = getattr(settings, 'API_ROLES', None) or permisos.ROLES
+
+    return [rol.upper() for rol in configurados]
 
 
 def clave_recibida(request):
@@ -121,22 +171,27 @@ def cuenta_activa(usuario):
 
 
 def es_usuario_autorizado(usuario):
-    """True si el usuario puede usar la API (rol y cuenta al dia)."""
+    """
+    True si el usuario puede usar la API.
+
+    Ya no pregunta si es super administrador: pregunta si su cuenta esta al
+    dia y si su rol efectivo esta entre los que pueden entrar. Los permisos
+    concretos se deciden despues, recurso por recurso.
+    """
     if not usuario or not getattr(usuario, 'is_authenticated', False):
         return False
 
     if not cuenta_activa(usuario):
         return False
 
-    # Un superusuario de Django siempre entra, tenga el rol que tenga.
     if getattr(usuario, 'is_superuser', False):
         return True
 
-    return getattr(usuario, 'rol', '') in roles_permitidos()
+    return permisos.rol_efectivo(usuario) in roles_permitidos()
 
 
 def por_sesion(request):
-    """¿Viene de un navegador con sesion de super administrador?"""
+    """¿Viene de un navegador con la sesion del sitio iniciada?"""
     return es_usuario_autorizado(getattr(request, 'user', None))
 
 
@@ -189,9 +244,9 @@ def por_token(request):
 
     if not es_usuario_autorizado(token.usuario):
         return _negar(
-            NO_SUPERADMIN,
-            f'La cuenta {token.usuario.correo} ya no tiene un rol '
-            f'autorizado ({", ".join(roles_permitidos())}) en esta base de datos.',
+            ROL_SIN_ACCESO,
+            f'La cuenta {token.usuario.correo} no tiene un rol con acceso '
+            f'a la API ({", ".join(roles_permitidos())}).',
             403,
         )
 
@@ -213,14 +268,16 @@ def como_autorizarse(request=None):
         'token': {
             'para': 'otras aplicaciones (es la via recomendada)',
             'paso_1': f'POST {ruta} con {{"correo": "...", "password": "..."}} '
-                      f'de un usuario SUPERADMIN de esta base de datos',
+                      f'de cualquier cuenta activa de esta base de datos',
             'paso_2': 'Envia el token recibido en cada peticion: '
                       'Authorization: Bearer <token>',
+            'paso_3': 'La respuesta del login trae tu rol y tus permisos: '
+                      'usalos para saber que puedes ver y modificar.',
         },
         'sesion': {
             'para': 'mirar la API tu mismo desde el navegador',
-            'como': 'Inicia sesion en /admin/ con un usuario SUPERADMIN y '
-                    'abre la API en la misma ventana.',
+            'como': 'Inicia sesion en el sitio o en /admin/ y abre la API en '
+                    'la misma ventana.',
         },
     }
 
@@ -233,16 +290,15 @@ def como_autorizarse(request=None):
     return pasos
 
 
-def autorizar(request, privado=False):
-    """
-    Comprueba el acceso a un recurso.
+# ── Identificacion ───────────────────────────────────────────────────────────
 
-    privado=True marca los recursos con datos personales (usuarios,
-    estudiantes): esos nunca quedan abiertos, siempre exigen identificarse.
+def identificar(request):
+    """
+    Averigua quien llama, sin mirar todavia que quiere hacer.
 
     Orden: sesion -> token -> clave. Si se envio un token se responde segun
     ese token, sin seguir probando: asi el error explica lo que pasa de
-    verdad (caducado, revocado, ya no es super admin).
+    verdad (caducado, revocado, cuenta inactiva).
     """
     if por_sesion(request):
         return Resultado(True, SESION, usuario=request.user)
@@ -252,24 +308,106 @@ def autorizar(request, privado=False):
         return resultado_token
 
     if por_clave(request):
-        return Resultado(True, CLAVE)
+        # Sin persona detras: el sitio ejecutando un script propio.
+        return Resultado(True, CLAVE, usuario=permisos.SITIO)
 
-    # Sin credenciales validas.
-    if privado or modo() == 'privada':
-        if getattr(settings, 'API_CLAVE', '') and clave_recibida(request):
-            return _negar(CLAVE_INVALIDA, 'La clave X-API-Key no coincide.')
-
-        return _negar(
-            SIN_CREDENCIALES,
-            'No se recibio ninguna credencial valida (sesion, token o clave).',
-        )
-
-    # Modo publico: el catalogo academico se consulta sin identificarse.
     if getattr(settings, 'API_CLAVE', '') and clave_recibida(request):
         # Mando una clave, pero es incorrecta: es un error, no un anonimo.
         return _negar(CLAVE_INVALIDA, 'La clave X-API-Key no coincide.')
 
-    return Resultado(True, ABIERTO)
+    return _negar(
+        SIN_CREDENCIALES,
+        'No se recibio ninguna credencial valida (sesion, token o clave). '
+        'Inicia sesion en /api/auth/login/.',
+    )
+
+
+# ── Autorizacion ─────────────────────────────────────────────────────────────
+
+def _negar_permiso(usuario, recurso, accion):
+    """El usuario es quien dice ser, pero su rol no llega a tanto."""
+    rol = permisos.rol_efectivo(usuario)
+    etiqueta = permisos.ETIQUETA_RECURSO.get(recurso, recurso)
+    puede_ahora = permisos.acciones_sobre(usuario, recurso)
+
+    detalle = (
+        f'Tu rol es {permisos.ETIQUETA_ROL.get(rol, rol)} y sobre '
+        f'"{etiqueta}" '
+    )
+    detalle += (
+        f'solo puedes: {", ".join(puede_ahora)}.' if puede_ahora
+        else 'no tienes ningun permiso.'
+    )
+
+    return Resultado(
+        False,
+        mensaje=SIN_PERMISO_MSG,
+        codigo=403,
+        motivo=SIN_PERMISO,
+        detalle=detalle,
+        usuario=usuario,
+    )
+
+
+def negar_alcance(usuario, recurso, detalle=''):
+    """
+    El rol si tiene el permiso, pero ese registro no es suyo.
+
+    La usan las vistas cuando ya han buscado el objeto concreto: un profesor
+    puede editar tareas, pero no las de un curso que no dicta.
+    """
+    rol = permisos.rol_efectivo(usuario)
+    etiqueta = permisos.ETIQUETA_RECURSO.get(recurso, recurso)
+
+    return Resultado(
+        False,
+        mensaje='Ese registro esta fuera de tu alcance.',
+        codigo=403,
+        motivo=FUERA_DE_ALCANCE,
+        detalle=detalle or (
+            f'Como {permisos.ETIQUETA_ROL.get(rol, rol)} solo trabajas con '
+            f'"{etiqueta}" de tu propio ambito.'
+        ),
+        usuario=usuario,
+    )
+
+
+def autorizar(request, privado=False, recurso=None, accion=permisos.VER):
+    """
+    Comprueba el acceso a un recurso: primero quien eres, luego que puedes.
+
+    privado=True marca los recursos con datos personales: esos nunca quedan
+    abiertos, siempre exigen identificarse aunque la API este en modo
+    publico.
+
+    recurso y accion son los de permisos.py. Si se pasan, ademas de
+    identificar al usuario se comprueba que su rol tenga ese permiso; el
+    alcance (que ese registro concreto sea suyo) lo afina cada vista, porque
+    hace falta haber buscado el objeto para saberlo.
+    """
+    resultado = identificar(request)
+
+    if not resultado:
+        # En modo publico, quien no se identifica no es un intruso: es un
+        # visitante, y como tal tiene su propia fila en la matriz. Se le da
+        # esa identidad y se sigue por el camino de siempre, de modo que sus
+        # limites se comprueban igual que los de todos los demas.
+        puede_visitar = (
+            resultado.motivo == SIN_CREDENCIALES
+            and not privado
+            and accion == permisos.VER
+            and modo() == 'publica'
+        )
+
+        if not puede_visitar:
+            return resultado
+
+        resultado = Resultado(True, ABIERTO, usuario=permisos.VISITA)
+
+    if recurso and not permisos.puede(resultado.usuario, recurso, accion):
+        return _negar_permiso(resultado.usuario, recurso, accion)
+
+    return resultado
 
 
 # ── Freno a la fuerza bruta en el login ──────────────────────────────────────
@@ -306,23 +444,23 @@ def olvidar_intentos(request, correo):
 
 def resumen(request):
     """Como esta configurada la seguridad ahora mismo (para el indice)."""
-    autorizado = autorizar(request, privado=True)
-    usuario = autorizado.usuario if autorizado else None
+    acceso = identificar(request)
+    persona = acceso.persona
 
     return {
         'modo': modo(),
         'vias': {
             'token': {
-                'activa': autorizado.via == TOKEN,
+                'activa': acceso.via == TOKEN,
                 'como': 'Authorization: Bearer <token>. El token se obtiene '
                         'en POST /api/auth/login/ con el correo y la '
-                        'contrasena de un usuario SUPERADMIN.',
+                        'contrasena de cualquier cuenta activa.',
                 'roles_permitidos': roles_permitidos(),
             },
             'sesion': {
                 'activa': por_sesion(request),
-                'como': 'Inicia sesion en /admin/ con un usuario SUPERADMIN '
-                        'y consulta la API en la misma ventana del navegador.',
+                'como': 'Inicia sesion en el sitio o en /admin/ y consulta '
+                        'la API en la misma ventana del navegador.',
                 'roles_permitidos': roles_permitidos(),
             },
             'clave': {
@@ -332,10 +470,12 @@ def resumen(request):
             },
         },
         'acceso_actual': {
-            'autorizado': bool(autorizado),
-            'via': autorizado.via,
-            'usuario': usuario.correo if usuario else None,
-            'motivo': autorizado.motivo,
-            'mensaje': autorizado.mensaje or None,
+            'autorizado': bool(acceso),
+            'via': acceso.via,
+            'usuario': persona.correo if persona else None,
+            'rol': acceso.rol,
+            'motivo': acceso.motivo,
+            'mensaje': acceso.mensaje or None,
         },
+        'permisos': permisos.resumen(acceso.usuario) if acceso and acceso.usuario else None,
     }

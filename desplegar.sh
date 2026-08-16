@@ -10,6 +10,9 @@
 # Hace: git clone -> entorno virtual -> dependencias -> .env -> migrate ->
 #       datos de prueba -> comprobacion de la API -> superusuario.
 #
+# Si ya lo habias ejecutado antes de que la API tuviera roles, al volver a
+# correrlo corrige solo la linea API_ROLES del .env (ver "3. configuracion").
+#
 # Se puede volver a ejecutar sin miedo: si algo ya existe, lo reutiliza.
 # NO toca la configuracion del sitio en el panel: eso lo haces tu al final,
 # con los datos que imprime.
@@ -229,16 +232,29 @@ if [ -f "$BACKEND/.env" ]; then
             CLAVE_API="$("$PY" -c 'import secrets; print(secrets.token_urlsafe(32))')"
             {
                 printf '%s\n' ""
-                printf '%s\n' "# API de consulta (/api/). Se entra con la sesion de un usuario"
-                printf '%s\n' "# SUPERADMIN o con esta clave (para programas externos)."
+                printf '%s\n' "# API (/api/). Se entra con la sesion del navegador, con un token"
+                printf '%s\n' "# (/api/auth/login/) o con esta clave (para programas externos)."
+                printf '%s\n' "# Entra cualquier cuenta activa; lo que puede hacer cada rol lo"
+                printf '%s\n' "# decide backend/api/permisos.py, no esta lista."
                 printf '%s\n' "API_MODO=privada"
-                printf '%s\n' "API_ROLES=SUPERADMIN"
+                printf '%s\n' "API_ROLES=SUPERADMIN,ADMIN,PROFESOR,ESTUDIANTE"
                 printf '%s\n' "API_CLAVE=$CLAVE_API"
                 printf '%s\n' "API_ORIGENES=*"
                 printf '%s\n' "API_TAM_PAGINA=25"
                 printf '%s\n' "API_TAM_PAGINA_MAX=100"
             } >> "$BACKEND/.env"
             ok "Anadida la configuracion de la API al .env existente"
+        fi
+
+        # Los .env creados antes de que la API tuviera roles traen
+        # API_ROLES=SUPERADMIN. Con esa linea, ni el administrador de
+        # facultad ni el profesor ni el estudiante pueden entrar: ni al
+        # sitio ni a la app movil. Se corrige aqui, porque quien reejecuta
+        # el script no tiene por que saber que existe esa linea.
+        if grep -q '^API_ROLES=SUPERADMIN$' "$BACKEND/.env"; then
+            sed -i 's/^API_ROLES=SUPERADMIN$/API_ROLES=SUPERADMIN,ADMIN,PROFESOR,ESTUDIANTE/' \
+                "$BACKEND/.env"
+            ok "Corregido API_ROLES: ahora entran los cuatro roles, no solo el super admin"
         fi
     else
         cp "$BACKEND/.env" "$BACKEND/.env.anterior"
@@ -288,10 +304,12 @@ if [ "$CREAR_ENV" = "1" ]; then
         printf '%s\n' "DJANGO_SECURE_SSL_REDIRECT=False"
         printf '%s\n' "DJANGO_SECURE_HSTS_SECONDS=0"
         printf '%s\n' ""
-        printf '%s\n' "# API de consulta (/api/). Se entra con la sesion de un usuario"
-        printf '%s\n' "# SUPERADMIN o con esta clave (para programas externos)."
+        printf '%s\n' "# API (/api/). Se entra con la sesion del navegador, con un token"
+        printf '%s\n' "# (/api/auth/login/) o con esta clave (para programas externos)."
+        printf '%s\n' "# Entra cualquier cuenta activa; lo que puede hacer cada rol lo"
+        printf '%s\n' "# decide backend/api/permisos.py, no esta lista."
         printf '%s\n' "API_MODO=privada"
-        printf '%s\n' "API_ROLES=SUPERADMIN"
+        printf '%s\n' "API_ROLES=SUPERADMIN,ADMIN,PROFESOR,ESTUDIANTE"
         printf '%s\n' "API_CLAVE=$CLAVE_API"
         printf '%s\n' "API_ORIGENES=*"
         printf '%s\n' "API_TAM_PAGINA=25"
@@ -487,22 +505,30 @@ Un solo usuario para todo
   administrador tienes los dos botones directos al panel de Django y al
   indice de la API.
 
-API de consulta (/api/)
+API (/api/)
 
-  Desde el navegador, sin claves: entra por https://$DOMINIO/ (o por
-  /admin/) con tu usuario SUPERADMIN y abre https://$DOMINIO/api/cursos/
+  Entra cualquier cuenta activa, con el rol que tenga. Lo que cambia de un
+  rol a otro no es si entra, sino que ve y que puede modificar:
 
-  Desde otra aplicacion, que tiene su propio login: cambia el correo y la
-  contrasena de un SUPERADMIN por un token y consulta con el.
+    SUPERADMIN  todo el sistema
+    ADMIN       su facultad: cursos, personas e inscripciones
+    PROFESOR    los cursos que dicta: contenido, tareas y notas
+    ESTUDIANTE  los cursos que cursa: sus entregas y su avance
+
+  Desde el navegador, sin claves: entra por https://$DOMINIO/ y abre
+  https://$DOMINIO/api/cursos/ en la misma ventana.
+
+  Desde otra aplicacion (la app movil, por ejemplo): cambia el correo y la
+  contrasena por un token. La respuesta trae su rol y sus permisos.
 
     curl -X POST -H "Content-Type: application/json" \\
       -d '{"correo":"TU_CORREO","password":"TU_CONTRASENA"}' \\
       https://$DOMINIO/api/auth/login/
 
-    curl -H "Authorization: Bearer TU_TOKEN" https://$DOMINIO/api/cursos/
+    curl -H "Authorization: Bearer TU_TOKEN" https://$DOMINIO/api/mi/panel/
 
-  Si esa cuenta no es super administrador, la respuesta es siempre la misma:
-  "No se ha autorizado que sea un super admin."
+  Los permisos se recalculan en CADA peticion: si a alguien le cambias el
+  rol en /admin/, su token deja de abrir lo que ya no le toca al instante.
 
   Con una clave fija del sitio, para tus propios scripts:
 
